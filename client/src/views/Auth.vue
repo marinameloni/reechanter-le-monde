@@ -6,7 +6,7 @@
       <input v-model="loginForm.username" placeholder="Username" />
       <input v-model="loginForm.password" type="password" placeholder="Password" />
       <button @click="handleLogin">Login</button>
-      <p v-if="loginError" class="error">{{ loginError }}</p>
+      <p v-if="auth.error" class="error">{{ auth.error }}</p>
     </div>
 
     <div class="signup">
@@ -28,7 +28,7 @@
       </div>
 
       <button @click="handleSignup">Sign Up</button>
-      <p v-if="signupError" class="error">{{ signupError }}</p>
+        <p v-if="auth.error" class="error">{{ auth.error }}</p>
     </div>
   </div>
   </section>
@@ -56,28 +56,17 @@ const signupForm = reactive({
   tshirt_color: '#0000ff'
 });
 
-const loginError = ref('');
-const signupError = ref('');
-
 const handleLogin = async () => {
-  loginError.value = '';
-  const success = await auth.login(loginForm.username, loginForm.password);
-  if (!success) {
-    loginError.value = 'Invalid credentials';
-    return;
-  }
+  await auth.login({ username: loginForm.username, password: loginForm.password });
+  if (!auth.user) return;
 
   // Redirection vers la partie après login réussi
   router.push('/game');
 };
 
 const handleSignup = async () => {
-  signupError.value = '';
-  const success = await auth.signup(signupForm);
-  if (!success) {
-    signupError.value = 'Signup failed';
-    return;
-  }
+  await auth.signup(signupForm);
+  if (!auth.user) return;
 
   // Après inscription on enchaîne directement sur le jeu
   router.push('/game');

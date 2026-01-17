@@ -1,37 +1,60 @@
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import api from '../services/api';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    player: null,
-    token: null,
+    user: null,      // { id, username, role, character_gender, hair_color, tshirt_color, ... }
+    token: null,     // JWT renvoyé par le backend
+    isAdmin: false,  // dérivé de user.role === 'admin'
+    error: null,     // dernier message d'erreur login/signup
+    loading: false,  // état de chargement
   }),
   actions: {
-    async login(username, password) {
+    async login(credentials) {
+      this.loading = true;
+      this.error = null;
       try {
-        const res = await axios.post('http://localhost:4000/api/auth/login', { username, password });
-        this.token = res.data.token;
-        this.player = res.data.player;
-        return true;
+        const res = await api.post('/api/auth/login', credentials);
+
+        // Compat avec la forme actuelle { success, token, player }
+        const payloadUser = res.data.user || res.data.player;
+
+        this.user = payloadUser;
+        this.token = res.data.token || null;
+        this.isAdmin = !!(payloadUser && payloadUser.role === 'admin');
       } catch (err) {
+        this.error = err.response?.data?.message || 'Login failed';
         console.error('Login failed', err);
-        return false;
+      } finally {
+        this.loading = false;
       }
     },
-    async signup(playerData) {
+
+    async signup(payload) {
+      this.loading = true;
+      this.error = null;
       try {
-        const res = await axios.post('http://localhost:4000/api/auth/signup', playerData);
-        this.token = res.data.token;
-        this.player = res.data.player;
-        return true;
+        const res = await api.post('/api/auth/signup', payload);
+
+        const payloadUser = res.data.user || res.data.player;
+
+        this.user = payloadUser;
+        this.token = res.data.token || null;
+        this.isAdmin = !!(payloadUser && payloadUser.role === 'admin');
       } catch (err) {
+        this.error = err.response?.data?.message || 'Signup failed';
         console.error('Signup failed', err);
-        return false;
+      } finally {
+        this.loading = false;
       }
     },
+
     logout() {
-      this.player = null;
+      this.user = null;
       this.token = null;
+      this.isAdmin = false;
+      this.error = null;
     },
   },
 });
+
