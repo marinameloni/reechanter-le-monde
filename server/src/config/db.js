@@ -51,5 +51,16 @@ export async function openDB() {
     await db.exec("ALTER TABLE player ADD COLUMN role TEXT DEFAULT 'user';");
   }
 
+  // S'assure que les colonnes bricks / rocks existent dans inventory
+  const inventoryColumns = await db.all("PRAGMA table_info('inventory');");
+  const hasBricksColumn = inventoryColumns.some((c) => c.name === 'bricks');
+  const hasRocksColumn = inventoryColumns.some((c) => c.name === 'rocks');
+  if (!hasBricksColumn) {
+    await db.exec("ALTER TABLE inventory ADD COLUMN bricks INTEGER DEFAULT 0;");
+  }
+  if (!hasRocksColumn) {
+    await db.exec("ALTER TABLE inventory ADD COLUMN rocks INTEGER DEFAULT 0;");
+  }
+
   return db;
 }

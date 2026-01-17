@@ -6,6 +6,7 @@ import { Server as ColyseusServer } from 'colyseus';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 
 import authRoutes from './routes/auth.routes.js';
+import gameRoutes from './routes/game.routes.js';
 import { GameRoom } from './rooms/GameRoom.js';
 
 const { json } = bodyParser;
@@ -17,6 +18,7 @@ app.use(json());
 
 // routes REST classiques
 app.use('/api/auth', authRoutes);
+app.use('/api/game', gameRoutes);
 
 // Crée le serveur HTTP partagé entre Express et Colyseus
 const server = createServer(app);

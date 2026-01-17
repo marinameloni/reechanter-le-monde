@@ -98,6 +98,9 @@ CREATE TABLE inventory (
   metal INTEGER DEFAULT 0,
   glass INTEGER DEFAULT 0,
 
+  bricks INTEGER DEFAULT 0,
+  rocks INTEGER DEFAULT 0,
+
   FOREIGN KEY (id_player) REFERENCES player(id_player)
 );
 

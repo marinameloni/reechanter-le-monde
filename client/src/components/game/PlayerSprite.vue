@@ -7,6 +7,7 @@
 			transform: `translate(${x * tileSize}px, ${y * tileSize - tileSize * 0.5}px)`,
 		}"
 	>
+		<div v-if="name" class="player-name">{{ name }}</div>
 		<img :src="girlSprite" alt="Player" class="player-image" />
 	</div>
 </template>
@@ -18,6 +19,7 @@ defineProps({
 	tileSize: { type: Number, required: true },
 	x: { type: Number, required: true },
 	y: { type: Number, required: true },
+	name: { type: String, default: '' },
 });
 </script>
 
@@ -31,6 +33,20 @@ defineProps({
 	align-items: flex-end;
 	justify-content: center;
 	pointer-events: none;
+}
+
+.player-name {
+	position: absolute;
+	bottom: 100%;
+	left: 50%;
+	transform: translateX(-50%) translateY(-2px);
+	padding: 0 4px;
+	font-size: 10px;
+	line-height: 1.2;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.7);
+	border-radius: 4px;
+	white-space: nowrap;
 }
 
 .player-image {

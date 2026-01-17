@@ -1,4 +1,5 @@
 import { Room } from "colyseus";
+import { openDB } from "../config/db.js";
 
 export class GameRoom extends Room {
   onCreate(options) {
@@ -7,7 +8,7 @@ export class GameRoom extends Room {
       tiles: [],
       ruins: [],
       buildings: [],
-      clients: [], // { sessionId, username }
+      clients: [], // { sessionId, username, x, y }
     });
 
     this.onMessage("clickRuin", (client, data) => {
@@ -17,13 +18,48 @@ export class GameRoom extends Room {
       }
       // Colyseus se charge de synchroniser l'état avec tous les clients
     });
+
+    // Réception des mises à jour de position des joueurs
+    this.onMessage("updatePosition", async (client, data) => {
+      if (!data || typeof data.x !== "number" || typeof data.y !== "number") {
+        return;
+      }
+
+      const player = this.state.clients.find(
+        (c) => c.sessionId === client.sessionId
+      );
+      if (!player) return;
+
+      player.x = data.x;
+      player.y = data.y;
+
+      // diffuse les nouvelles positions à tous les clients
+      this.broadcast("clients", this.state.clients);
+
+      // Persiste également la position dans la base (player.x / player.y / id_map)
+      try {
+        const db = await openDB();
+        await db.run(
+          `UPDATE player SET x = ?, y = ?, id_map = ? WHERE username = ?;`,
+          [player.x, player.y, 1, player.username]
+        );
+      } catch (err) {
+        console.error("Failed to persist player position", err);
+      }
+    });
   }
 
   onJoin(client, options) {
     console.log(`${client.sessionId} joined GameRoom`);
 
     const username = options?.username || client.sessionId;
-    this.state.clients.push({ sessionId: client.sessionId, username });
+    // position de départ simple (sera plus tard issue de la DB)
+    this.state.clients.push({
+      sessionId: client.sessionId,
+      username,
+      x: 1,
+      y: 1,
+    });
 
     // diffuse la liste complète à tous les clients
     this.broadcast("clients", this.state.clients);

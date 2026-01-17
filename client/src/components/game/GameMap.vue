@@ -8,13 +8,34 @@
 					:key="tile.id"
 					:size="map.tileSize"
 					:blocked="isBlocked(tile.x, tile.y)"
+					@click="handleTileClick(tile)"
 				/>
 			</div>
 			<PlayerSprite
 				:tile-size="map.tileSize"
 				:x="playerX"
 				:y="playerY"
+				:name="auth.user?.username || ''"
 			/>
+			<PlayerSprite
+				v-for="p in otherPlayers"
+				:key="p.sessionId"
+				:tile-size="map.tileSize"
+				:x="p.x ?? 1"
+				:y="p.y ?? 1"
+				:name="p.username"
+			/>
+			<div
+				v-if="activeFactory"
+				class="factory-progress"
+				:style="{
+					transform: `translate(${activeFactory.x * map.tileSize}px, ${
+						activeFactory.y * map.tileSize - 20
+					}px)`,
+				}"
+			>
+				{{ factoryClicks }} / {{ factoryClicksRequired }}
+			</div>
 		</div>
 		<div class="hud">
 			<p>Position: ({{ playerX }}, {{ playerY }})</p>
@@ -28,11 +49,17 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref } from 'vue';
+import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
+import { useAuthStore } from '../../store/auth.store';
+import { useGameStore } from '../../store/game.store';
+import api from '../../services/api';
 import map from '../../assets/maps/map1.json';
 import mapImage from '../../assets/maps/maplevel1.png';
 import Tile from './Tile.vue';
 import PlayerSprite from './PlayerSprite.vue';
+
+const auth = useAuthStore();
+const gameStore = useGameStore();
 
 const wrapperStyle = {
 	width: map.width * map.tileSize + 'px',
@@ -230,13 +257,70 @@ const bricks = ref(0);
 const rocks = ref(0);
 const destroyedTiles = ref([]);
 
+const factoryClicks = ref(0);
+const factoryClicksRequired = 300;
+const activeFactory = ref(null);
+
 function isDestroyed(x, y) {
 	return destroyedTiles.value.some((t) => t.x === x && t.y === y);
 }
 
+			const otherPlayers = computed(() => {
+				const me = auth.user?.username;
+				return (gameStore.clients || []).filter(
+					(p) => p.username && p.username !== me
+				);
+			});
 function isBlocked(x, y) {
 	const key = `${x},${y}`;
 	return unwalkableSet.has(key) && !isDestroyed(x, y);
+}
+
+async function sendProgress({ deltaBricks = 0, deltaRocks = 0, deltaWorldScore = 0 }) {
+	const playerId = auth.user?.id;
+	if (!playerId) return;
+	try {
+		await api.post('/api/game/progress', {
+			playerId,
+			deltaBricks,
+			deltaRocks,
+			deltaWorldScore,
+		});
+	} catch (err) {
+		console.error('Failed to persist game progress', err);
+	}
+}
+
+function doFactoryClick(x, y) {
+	if (factoryClicks.value >= factoryClicksRequired) return;
+	activeFactory.value = { x, y };
+	factoryClicks.value += 1;
+	if (factoryClicks.value % 20 === 0) {
+		bricks.value += 1;
+		// Persist 1 brick gained and 1 point of world progress
+		sendProgress({ deltaBricks: 1, deltaWorldScore: 1 });
+	}
+	if (factoryClicks.value >= factoryClicksRequired) {
+		factoryCoords.forEach(([fx, fy]) => {
+			if (!isDestroyed(fx, fy)) {
+				destroyedTiles.value.push({ x: fx, y: fy });
+			}
+		});
+	}
+}
+
+function handleTileClick(tile) {
+	const key = `${tile.x},${tile.y}`;
+	if (factorySet.has(key)) {
+		doFactoryClick(tile.x, tile.y);
+		return;
+	}
+	if (debrisSet.has(key) && !isDestroyed(tile.x, tile.y)) {
+		destroyedTiles.value.push({ x: tile.x, y: tile.y });
+		rocks.value += 1;
+		// Persist 1 rock gained and 1 point of world progress
+		sendProgress({ deltaRocks: 1, deltaWorldScore: 1 });
+	}
 }
 
 function movePlayer(deltaX, deltaY) {
@@ -255,13 +339,23 @@ function movePlayer(deltaX, deltaY) {
 	}
 	playerX.value = targetX;
 	playerY.value = targetY;
+
+	if (gameStore.room) {
+		try {
+			gameStore.room.send('updatePosition', {
+				x: playerX.value,
+				y: playerY.value,
+			});
+		} catch (err) {
+			console.error('Failed to send position update', err);
+		}
+	}
 }
 
 function interact() {
 	const key = `${playerX.value},${playerY.value}`;
 	if (factorySet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
-		destroyedTiles.value.push({ x: playerX.value, y: playerY.value });
-		bricks.value += 1;
+		doFactoryClick(playerX.value, playerY.value);
 		return;
 	}
 	if (debrisSet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
@@ -302,6 +396,18 @@ function handleKeyDown(event) {
 
 onMounted(() => {
 	window.addEventListener('keydown', handleKeyDown);
+
+	// Envoie la position initiale du joueur au serveur temps réel
+	if (gameStore.room) {
+		try {
+			gameStore.room.send('updatePosition', {
+				x: playerX.value,
+				y: playerY.value,
+			});
+		} catch (err) {
+			console.error('Failed to send initial position', err);
+		}
+	}
 });
 
 onBeforeUnmount(() => {
@@ -334,7 +440,7 @@ onBeforeUnmount(() => {
 	position: absolute;
 	top: 0;
 	left: 0;
-	pointer-events: none;
+	pointer-events: auto;
 }
 
 .hud {
@@ -346,5 +452,16 @@ onBeforeUnmount(() => {
 .controls {
 	font-size: 0.8rem;
 	color: #777;
+}
+
+.factory-progress {
+	position: absolute;
+	z-index: 11;
+	padding: 2px 4px;
+	background: rgba(0, 0, 0, 0.8);
+	color: #fff;
+	font-size: 10px;
+	border-radius: 4px;
+	transform-origin: bottom center;
 }
 </style>

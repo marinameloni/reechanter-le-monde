@@ -35,10 +35,10 @@ export const useGameStore = defineStore('game', {
 					this.buildings = state.buildings || [];
 				});
 
-					// Mise à jour de la liste des joueurs connectés via messages explicites
-					room.onMessage('clients', (clients) => {
-						this.clients = clients || [];
-					});
+				// Mise à jour de la liste des joueurs connectés (avec positions) via messages explicites
+				room.onMessage('clients', (clients) => {
+					this.clients = clients || [];
+				});
 			} catch (err) {
 				console.error('Failed to connect to Colyseus room', err);
 					this.error = 'Impossible de se connecter au serveur de jeu';
