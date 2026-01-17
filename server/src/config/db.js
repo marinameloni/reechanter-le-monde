@@ -30,5 +30,12 @@ export async function openDB() {
     await db.exec(sql);
   }
 
+  // S'assure que la colonne "role" existe dans player (pour distinguer admin / user)
+  const columns = await db.all("PRAGMA table_info('player');");
+  const hasRoleColumn = columns.some((c) => c.name === 'role');
+  if (!hasRoleColumn) {
+    await db.exec("ALTER TABLE player ADD COLUMN role TEXT DEFAULT 'user';");
+  }
+
   return db;
 }
