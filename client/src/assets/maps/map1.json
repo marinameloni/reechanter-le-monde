@@ -1,0 +1,10 @@
+{
+  "id": 1,
+  "name": "Map 1",
+  "image": "maplevel1.png",
+  "width": 32,
+  "height": 18,
+  "tileSize": 32,
+  "description": "First ruined area, collaborative cleanup.",
+  "tiles": []
+}

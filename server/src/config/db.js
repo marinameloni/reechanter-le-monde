@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 
 const dbPath = path.resolve(__dirname, '../database/game.sqlite');
 const migrationsPath = path.resolve(__dirname, '../database/migrations/init.sql');
+const baseDataPath = path.resolve(__dirname, '../database/seeds/base-data.sql');
 
 export async function openDB() {
   const db = await open({
@@ -28,6 +29,19 @@ export async function openDB() {
   if (!row) {
     const sql = await fs.readFile(migrationsPath, 'utf8');
     await db.exec(sql);
+  }
+
+  // Seed base data (maps, tiles...) if map table is empty
+  const mapCountRow = await db.get('SELECT COUNT(*) as count FROM map;');
+  if (mapCountRow?.count === 0) {
+    try {
+      const baseSql = await fs.readFile(baseDataPath, 'utf8');
+      if (baseSql && baseSql.trim().length > 0) {
+        await db.exec(baseSql);
+      }
+    } catch (err) {
+      console.error('Failed to load base data seed:', err);
+    }
   }
 
   // S'assure que la colonne "role" existe dans player (pour distinguer admin / user)

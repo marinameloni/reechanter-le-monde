@@ -33,9 +33,12 @@
 			</section>
 
 			<!-- Placeholder pour la future carte 2D -->
-			<pre class="debug-state">
+			<section class="map-section">
+				<GameMap />
+				<pre class="debug-state">
 Tiles: {{ game.tiles.length }} | Ruins: {{ game.ruins.length }} | Buildings: {{ game.buildings.length }}
-			</pre>
+				</pre>
+			</section>
 		</main>
 	</section>
 </template>
@@ -44,6 +47,7 @@ Tiles: {{ game.tiles.length }} | Ruins: {{ game.ruins.length }} | Buildings: {{ 
 import { onMounted } from 'vue';
 import { useAuthStore } from '../store/auth.store';
 import { useGameStore } from '../store/game.store';
+import GameMap from '../components/game/GameMap.vue';
 
 const auth = useAuthStore();
 const game = useGameStore();
@@ -99,5 +103,12 @@ onMounted(async () => {
 .error {
 	color: #b3261e;
 	margin-bottom: 10px;
+}
+
+.map-section {
+	display: flex;
+	gap: 20px;
+	align-items: flex-start;
+	margin-top: 20px;
 }
 </style>
