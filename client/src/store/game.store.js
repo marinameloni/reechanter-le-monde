@@ -11,7 +11,7 @@ export const useGameStore = defineStore('game', {
 		inventory: null,   // inventaire du joueur
 		room: null,        // instance Colyseus Room
 		connected: false,  // connexion temps réel active
-		clients: [],       // joueurs connectés à la room
+		clients: [],       // joueurs connectés à la room (avec x, y, color_primary, ...)
 		loading: false,
 		error: null,
 	}),
@@ -21,8 +21,8 @@ export const useGameStore = defineStore('game', {
 
 			try {
 				// Colyseus est servi via le même port HTTP que l'API (4000)
-					const client = new Client('ws://localhost:4000');
-					const room = await client.joinOrCreate('game_room', { username });
+				const client = new Client('ws://localhost:4000');
+				const room = await client.joinOrCreate('game_room', { username });
 
 				this.room = room;
 				this.connected = true;
@@ -41,7 +41,24 @@ export const useGameStore = defineStore('game', {
 				});
 			} catch (err) {
 				console.error('Failed to connect to Colyseus room', err);
-					this.error = 'Impossible de se connecter au serveur de jeu';
+				this.error = 'Impossible de se connecter au serveur de jeu';
+			}
+		},
+
+		async updatePlayerColor(playerId, newColor) {
+			try {
+				// Persistance via API REST
+				await api.post('/api/player/colors', {
+					playerId,
+					color_primary: newColor,
+				});
+
+				// Notification temps réel aux autres joueurs via Colyseus
+				if (this.room) {
+					this.room.send('updateColor', { color_primary: newColor });
+				}
+			} catch (err) {
+				console.error('Failed to update player color', err);
 			}
 		},
 

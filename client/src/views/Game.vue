@@ -12,7 +12,7 @@
 					></div>
 					<div
 						class="tshirt"
-						:style="{ backgroundColor: auth.user.tshirt_color || '#fff' }"
+						:style="{ backgroundColor: auth.user.color_primary || auth.user.tshirt_color || '#fff' }"
 					></div>
 				</div>
 			</div>
@@ -22,6 +22,17 @@
 			<p v-if="game.error" class="error">{{ game.error }}</p>
 			<p v-else-if="!game.connected">Connexion au serveur de jeu en cours...</p>
 			<p v-else>Connecté au serveur temps réel (Colyseus).</p>
+
+			<section v-if="auth.user" class="color-customization">
+				<label>
+					Couleur principale du robot :
+					<input
+						type="color"
+						v-model="localColor"
+						@change="handleColorChange"
+					/>
+				</label>
+			</section>
 
 			<section class="players" v-if="game.clients.length">
 				<h2>Joueurs connectés</h2>
@@ -44,13 +55,40 @@ Tiles: {{ game.tiles.length }} | Ruins: {{ game.ruins.length }} | Buildings: {{ 
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useAuthStore } from '../store/auth.store';
 import { useGameStore } from '../store/game.store';
 import GameMap from '../components/game/GameMap.vue';
 
 const auth = useAuthStore();
 const game = useGameStore();
+
+const localColor = ref('#D674CB');
+
+watch(
+	() => auth.user,
+	(user) => {
+		if (user) {
+			localColor.value =
+				user.color_primary || user.tshirt_color || user.hair_color || '#D674CB';
+		}
+	},
+	{ immediate: true }
+);
+
+const handleColorChange = async () => {
+	if (!auth.user) return;
+	const newColor = localColor.value;
+
+	// mets à jour immédiatement le user local
+	auth.user = {
+		...auth.user,
+		color_primary: newColor,
+	};
+
+	// persistance + temps réel via le store de jeu
+	await game.updatePlayerColor(auth.user.id, newColor);
+};
 
 onMounted(async () => {
 	await game.connectToRoom(auth.user?.username);
@@ -110,5 +148,15 @@ onMounted(async () => {
 	gap: 20px;
 	align-items: flex-start;
 	margin-top: 20px;
+}
+
+.color-customization {
+	margin: 10px 0 0;
+	font-size: 0.9rem;
+}
+
+.color-customization input[type='color'] {
+	margin-left: 8px;
+	vertical-align: middle;
 }
 </style>

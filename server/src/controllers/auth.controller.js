@@ -18,10 +18,34 @@ export async function signup(req, res) {
 
     const hash = await bcrypt.hash(password, 10);
 
+    // couleur principale par défaut : on réutilise une des anciennes couleurs si présente
+    const defaultPrimaryColor = tshirt_color || hair_color || '#D674CB';
+
     const result = await db.run(
-      `INSERT INTO player (username, email, password_hash, character_gender, hair_color, tshirt_color, role)
-       VALUES (?, ?, ?, ?, ?, ?, 'user')`,
-      [username, email, hash, character_gender, hair_color, tshirt_color]
+      `INSERT INTO player (
+        username,
+        email,
+        password_hash,
+        character_gender,
+        hair_color,
+        tshirt_color,
+        color_primary,
+        color_secondary,
+        color_tertiary,
+        role
+      )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user')`,
+      [
+        username,
+        email,
+        hash,
+        character_gender,
+        hair_color,
+        tshirt_color,
+        defaultPrimaryColor,
+        null,
+        null,
+      ]
     );
 
     // Récupère le joueur fraîchement créé pour renvoyer toutes les infos utiles au front
@@ -44,6 +68,9 @@ export async function signup(req, res) {
         character_gender: player.character_gender,
         hair_color: player.hair_color,
         tshirt_color: player.tshirt_color,
+        color_primary: player.color_primary,
+        color_secondary: player.color_secondary,
+        color_tertiary: player.color_tertiary,
         role: player.role || 'user',
       },
     });
@@ -66,8 +93,19 @@ export async function login(req, res) {
       if (!player) {
         const hash = await bcrypt.hash('clubpenguin123', 10);
         const result = await db.run(
-          `INSERT INTO player (username, email, password_hash, character_gender, hair_color, tshirt_color, role)
-           VALUES ('admin', 'admin@example.com', ?, 'female', '#000000', '#ffffff', 'admin')`,
+          `INSERT INTO player (
+            username,
+            email,
+            password_hash,
+            character_gender,
+            hair_color,
+            tshirt_color,
+            color_primary,
+            color_secondary,
+            color_tertiary,
+            role
+          )
+           VALUES ('admin', 'admin@example.com', ?, 'female', '#000000', '#ffffff', '#000000', NULL, NULL, 'admin')`,
           [hash]
         );
         player = await db.get(`SELECT * FROM player WHERE id_player = ?`, [result.lastID]);
@@ -99,6 +137,16 @@ export async function login(req, res) {
       }
     }
 
+    // Assure une couleur principale même pour les anciens comptes
+    if (!player.color_primary) {
+      const inferredPrimary = player.tshirt_color || player.hair_color || '#D674CB';
+      await db.run(
+        `UPDATE player SET color_primary = ? WHERE id_player = ?`,
+        [inferredPrimary, player.id_player]
+      );
+      player.color_primary = inferredPrimary;
+    }
+
     const token = jwt.sign({ id_player: player.id_player, username: player.username }, SECRET, {
       expiresIn: '1h',
     });
@@ -113,6 +161,9 @@ export async function login(req, res) {
         character_gender: player.character_gender,
         hair_color: player.hair_color,
         tshirt_color: player.tshirt_color,
+        color_primary: player.color_primary,
+        color_secondary: player.color_secondary,
+        color_tertiary: player.color_tertiary,
         role: player.role || (player.username === 'admin' ? 'admin' : 'user'),
       },
     });

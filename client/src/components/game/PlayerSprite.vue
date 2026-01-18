@@ -3,24 +3,94 @@
 		class="player-sprite"
 		:style="{
 			width: tileSize + 'px',
-			height: tileSize * 1.5 + 'px',
-			transform: `translate(${x * tileSize}px, ${y * tileSize - tileSize * 0.5}px)`,
+			height: tileSize + 'px',
+			transform: `translate(${x * tileSize}px, ${y * tileSize}px)`
 		}"
 	>
 		<div v-if="name" class="player-name">{{ name }}</div>
-		<img :src="girlSprite" alt="Player" class="player-image" />
+		<div ref="svgContainer" class="player-svg" v-html="spriteSvg"></div>
 	</div>
 </template>
 
 <script setup>
-import girlSprite from '../../assets/sprites/girl.png';
+import { onMounted, watch, ref, nextTick } from 'vue';
+import frontSvg from '../../assets/sprites/front.svg?raw';
+import backSvg from '../../assets/sprites/back.svg?raw';
+import sideLeftSvg from '../../assets/sprites/sideleft.svg?raw';
+import sideRightSvg from '../../assets/sprites/sideright.svg?raw';
+import walkFront1Svg from '../../assets/sprites/walkfront1.svg?raw';
+import walkFront2Svg from '../../assets/sprites/walkfront2.svg?raw';
+import walkLeft1Svg from '../../assets/sprites/walkleft1.svg?raw';
+import walkLeft2Svg from '../../assets/sprites/walkleft2.svg?raw';
+import walkRight1Svg from '../../assets/sprites/walkright1.svg?raw';
+import walkRight2Svg from '../../assets/sprites/walkright2.svg?raw';
 
-defineProps({
+const props = defineProps({
 	tileSize: { type: Number, required: true },
 	x: { type: Number, required: true },
 	y: { type: Number, required: true },
 	name: { type: String, default: '' },
+	// couleur principale appliquée sur un sous-ensemble d'IDs du robot
+	colorPrimary: { type: String, default: '#D674CB' },
+	direction: { type: String, default: 'down' }, // 'down' | 'up' | 'left' | 'right'
+	isWalking: { type: Boolean, default: false },
 });
+
+const svgContainer = ref(null);
+// Helper to pick the right SVG string based on direction and walk
+function getSpriteSvg(direction, isWalking) {
+	if (direction === 'up') return backSvg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+	if (direction === 'left') {
+		if (isWalking) return walkLeft1Svg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+		return sideLeftSvg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+	}
+	if (direction === 'right') {
+		if (isWalking) return walkRight1Svg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+		return sideRightSvg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+	}
+	if (direction === 'down') {
+		if (isWalking) return walkFront1Svg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+		return frontSvg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+	}
+	return frontSvg.replace('<svg ', '<svg viewBox="0 0 523 597" preserveAspectRatio="xMidYMax meet" width="45" height="45" ');
+}
+
+import { computed } from 'vue';
+const spriteSvg = computed(() => getSpriteSvg(props.direction, props.isWalking));
+
+const PRIMARY_IDS = ['id2', 'id3'];
+
+function applyColors() {
+	const root = svgContainer.value;
+	if (!root) return;
+
+	// recherche les éléments à recolorer uniquement dans ce sprite
+	PRIMARY_IDS.forEach((id) => {
+		const el = root.querySelector(`#${id}`);
+		if (el) {
+			el.style.fill = props.colorPrimary;
+		}
+	});
+}
+
+onMounted(async () => {
+	// s'assure que le SVG est dans le DOM avant d'appliquer les couleurs
+	await nextTick();
+	applyColors();
+});
+
+watch(
+	() => props.colorPrimary,
+	() => {
+		applyColors();
+	}
+);
+watch(
+	() => [props.colorPrimary, spriteSvg.value],
+	() => {
+		applyColors();
+	}
+);
 </script>
 
 <style scoped>
@@ -49,11 +119,20 @@ defineProps({
 	white-space: nowrap;
 }
 
-.player-image {
+.player-svg {
 	width: 100%;
 	height: 100%;
-	object-fit: contain;
-	image-rendering: pixelated;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+}
+
+.player-svg svg {
+	width: 45px;
+	height: 45px;
+	max-width: 100%;
+	max-height: 100%;
+	display: block;
 	filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.7));
 }
 </style>

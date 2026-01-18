@@ -16,6 +16,9 @@
 				:x="playerX"
 				:y="playerY"
 				:name="auth.user?.username || ''"
+				:color-primary="auth.user?.color_primary || auth.user?.tshirt_color || auth.user?.hair_color || '#D674CB'"
+				:direction="playerDirection"
+				:is-walking="isWalking"
 			/>
 			<PlayerSprite
 				v-for="p in otherPlayers"
@@ -24,6 +27,7 @@
 				:x="p.x ?? 1"
 				:y="p.y ?? 1"
 				:name="p.username"
+				:color-primary="p.color_primary || '#D674CB'"
 			/>
 			<div
 				v-if="activeFactory"
@@ -253,6 +257,8 @@ const debrisSet = new Set(debrisCoords.map(([x, y]) => `${x},${y}`));
 
 const playerX = ref(1);
 const playerY = ref(1);
+const playerDirection = ref('down'); // 'down' | 'up' | 'left' | 'right'
+const isWalking = ref(false);
 const bricks = ref(0);
 const rocks = ref(0);
 const destroyedTiles = ref([]);
@@ -265,12 +271,12 @@ function isDestroyed(x, y) {
 	return destroyedTiles.value.some((t) => t.x === x && t.y === y);
 }
 
-			const otherPlayers = computed(() => {
-				const me = auth.user?.username;
-				return (gameStore.clients || []).filter(
-					(p) => p.username && p.username !== me
-				);
-			});
+const otherPlayers = computed(() => {
+	const me = auth.user?.username;
+	return (gameStore.clients || []).filter(
+		(p) => p.username && p.username !== me
+	);
+});
 function isBlocked(x, y) {
 	const key = `${x},${y}`;
 	return unwalkableSet.has(key) && !isDestroyed(x, y);
@@ -324,6 +330,12 @@ function handleTileClick(tile) {
 }
 
 function movePlayer(deltaX, deltaY) {
+	// Déterminer la direction
+	if (deltaX === 1 && deltaY === 0) playerDirection.value = 'right';
+	else if (deltaX === -1 && deltaY === 0) playerDirection.value = 'left';
+	else if (deltaX === 0 && deltaY === -1) playerDirection.value = 'up';
+	else if (deltaX === 0 && deltaY === 1) playerDirection.value = 'down';
+	isWalking.value = true;
 	const targetX = playerX.value + deltaX;
 	const targetY = playerY.value + deltaY;
 	if (
@@ -339,6 +351,7 @@ function movePlayer(deltaX, deltaY) {
 	}
 	playerX.value = targetX;
 	playerY.value = targetY;
+	setTimeout(() => { isWalking.value = false; }, 200); // reset walk anim after 200ms
 
 	if (gameStore.room) {
 		try {

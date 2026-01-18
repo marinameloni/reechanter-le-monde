@@ -15,17 +15,21 @@
       <input v-model="signupForm.email" placeholder="Email" />
       <input v-model="signupForm.password" type="password" placeholder="Password" />
 
-      <div class="character">
-        <p>Gender:</p>
-        <label><input type="radio" value="female" v-model="signupForm.character_gender" /> Female</label>
-        <label><input type="radio" value="male" v-model="signupForm.character_gender" /> Male</label>
+    <div class="character">
+    <SignupSpritePreview
+      :hair-color="signupForm.hair_color"
+      :tshirt-color="signupForm.tshirt_color"
+    />
+    <p>Gender:</p>
+    <label><input type="radio" value="female" v-model="signupForm.character_gender" /> Female</label>
+    <label><input type="radio" value="male" v-model="signupForm.character_gender" /> Male</label>
 
-        <p>Hair Color:</p>
-        <input type="color" v-model="signupForm.hair_color" />
+    <p>Hair Color:</p>
+    <input type="color" v-model="signupForm.hair_color" />
 
-        <p>T-shirt Color:</p>
-        <input type="color" v-model="signupForm.tshirt_color" />
-      </div>
+    <p>T-shirt Color:</p>
+    <input type="color" v-model="signupForm.tshirt_color" />
+    </div>
 
       <button @click="handleSignup">Sign Up</button>
         <p v-if="auth.error" class="error">{{ auth.error }}</p>
@@ -36,6 +40,7 @@
 
 <script setup>
 import { reactive, ref } from 'vue';
+import SignupSpritePreview from '../components/game/SignupSpritePreview.vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../store/auth.store';
 
@@ -53,7 +58,10 @@ const signupForm = reactive({
   password: '',
   character_gender: 'female',
   hair_color: '#ff0000',
-  tshirt_color: '#0000ff'
+  tshirt_color: '#0000ff',
+  color_primary: '#0000ff',
+  color_secondary: null,
+  color_tertiary: null,
 });
 
 const handleLogin = async () => {
@@ -65,6 +73,8 @@ const handleLogin = async () => {
 };
 
 const handleSignup = async () => {
+  // color_primary = tshirt_color, for now
+  signupForm.color_primary = signupForm.tshirt_color;
   await auth.signup(signupForm);
   if (!auth.user) return;
 
