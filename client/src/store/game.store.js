@@ -11,7 +11,7 @@ export const useGameStore = defineStore('game', {
 		inventory: null,   // inventaire du joueur
 		room: null,        // instance Colyseus Room
 		connected: false,  // connexion temps réel active
-		clients: [],       // joueurs connectés à la room (avec x, y, color_primary, ...)
+		clients: [],       // joueurs connectés à la room (avec x, y, color, ...)
 		loading: false,
 		error: null,
 	}),
@@ -48,14 +48,14 @@ export const useGameStore = defineStore('game', {
 		async updatePlayerColor(playerId, newColor) {
 			try {
 				// Persistance via API REST
-				await api.post('/api/player/colors', {
+				await api.post('/api/player/color', {
 					playerId,
-					color_primary: newColor,
+					color: newColor,
 				});
 
 				// Notification temps réel aux autres joueurs via Colyseus
 				if (this.room) {
-					this.room.send('updateColor', { color_primary: newColor });
+					this.room.send('updateColor', { color: newColor });
 				}
 			} catch (err) {
 				console.error('Failed to update player color', err);

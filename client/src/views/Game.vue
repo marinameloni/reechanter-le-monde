@@ -5,16 +5,7 @@
 			<div v-if="auth.user" class="player-info">
 				<span class="username">{{ auth.user.username }}</span>
 				<span class="role" v-if="auth.isAdmin">(admin)</span>
-				<div class="avatar-preview">
-					<div
-						class="hair"
-						:style="{ backgroundColor: auth.user.hair_color || '#000' }"
-					></div>
-					<div
-						class="tshirt"
-						:style="{ backgroundColor: auth.user.color_primary || auth.user.tshirt_color || '#fff' }"
-					></div>
-				</div>
+				<div class="robot-preview" :style="{ backgroundColor: localColor }"></div>
 			</div>
 		</header>
 
@@ -23,16 +14,21 @@
 			<p v-else-if="!game.connected">Connexion au serveur de jeu en cours...</p>
 			<p v-else>Connecté au serveur temps réel (Colyseus).</p>
 
-			<section v-if="auth.user" class="color-customization">
-				<label>
-					Couleur principale du robot :
-					<input
-						type="color"
-						v-model="localColor"
-						@change="handleColorChange"
-					/>
-				</label>
-			</section>
+      <section v-if="auth.user" class="color-customization">
+        <label>
+          Couleur du robot :
+          <div class="color-selector">
+            <div
+              v-for="c in availableColors"
+              :key="c"
+              class="color-option"
+              :class="{ selected: localColor === c }"
+              :style="{ backgroundColor: c }"
+              @click="handleColorChange(c)"
+            ></div>
+          </div>
+        </label>
+      </section>
 
 			<section class="players" v-if="game.clients.length">
 				<h2>Joueurs connectés</h2>
@@ -63,27 +59,27 @@ import GameMap from '../components/game/GameMap.vue';
 const auth = useAuthStore();
 const game = useGameStore();
 
-const localColor = ref('#D674CB');
+const localColor = ref('#ccc');
+const availableColors = ['blue', 'green', 'orange', 'pink', 'purple', 'red', 'turquoise', 'yellow'];
 
 watch(
-	() => auth.user,
-	(user) => {
-		if (user) {
-			localColor.value =
-				user.color_primary || user.tshirt_color || user.hair_color || '#D674CB';
+	() => auth.user?.color,
+	(newColor) => {
+		if (newColor) {
+			localColor.value = newColor;
 		}
 	},
 	{ immediate: true }
 );
 
-const handleColorChange = async () => {
+const handleColorChange = async (newColor) => {
 	if (!auth.user) return;
-	const newColor = localColor.value;
+  localColor.value = newColor;
 
 	// mets à jour immédiatement le user local
 	auth.user = {
 		...auth.user,
-		color_primary: newColor,
+		color: newColor,
 	};
 
 	// persistance + temps réel via le store de jeu
@@ -113,42 +109,34 @@ onMounted(async () => {
 	gap: 10px;
 }
 
-.avatar-preview {
-	display: flex;
-	flex-direction: column;
+.robot-preview {
 	width: 24px;
+	height: 24px;
+	border: 1px solid #000;
 }
 
-.hair {
-	width: 24px;
-	height: 8px;
-	border-radius: 4px 4px 0 0;
+.color-customization {
+  margin: 10px 0;
 }
 
-.tshirt {
-	width: 24px;
-	height: 16px;
-	border-radius: 0 0 4px 4px;
+.color-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 5px;
 }
 
-.debug-state {
-	margin-top: 20px;
-	background: #f4f4f4;
-	padding: 10px;
-	border-radius: 4px;
+.color-option {
+  width: 30px;
+  height: 30px;
+  border: 2px solid transparent;
+  cursor: pointer;
 }
 
-.error {
-	color: #b3261e;
-	margin-bottom: 10px;
+.color-option.selected {
+  border-color: #000;
 }
 
-.map-section {
-	display: flex;
-	gap: 20px;
-	align-items: flex-start;
-	margin-top: 20px;
-}
 
 .color-customization {
 	margin: 10px 0 0;

@@ -16,19 +16,18 @@
       <input v-model="signupForm.password" type="password" placeholder="Password" />
 
     <div class="character">
-    <SignupSpritePreview
-      :hair-color="signupForm.hair_color"
-      :tshirt-color="signupForm.tshirt_color"
-    />
-    <p>Gender:</p>
-    <label><input type="radio" value="female" v-model="signupForm.character_gender" /> Female</label>
-    <label><input type="radio" value="male" v-model="signupForm.character_gender" /> Male</label>
-
-    <p>Hair Color:</p>
-    <input type="color" v-model="signupForm.hair_color" />
-
-    <p>T-shirt Color:</p>
-    <input type="color" v-model="signupForm.tshirt_color" />
+      <SignupSpritePreview :color="signupForm.color" />
+      <p>Robot Color:</p>
+      <div class="color-selector">
+        <div
+          v-for="c in availableColors"
+          :key="c"
+          class="color-option"
+          :class="{ selected: signupForm.color === c }"
+          :style="{ backgroundColor: c }"
+          @click="signupForm.color = c"
+        ></div>
+      </div>
     </div>
 
       <button @click="handleSignup">Sign Up</button>
@@ -56,13 +55,10 @@ const signupForm = reactive({
   username: '',
   email: '',
   password: '',
-  character_gender: 'female',
-  hair_color: '#ff0000',
-  tshirt_color: '#0000ff',
-  color_primary: '#0000ff',
-  color_secondary: null,
-  color_tertiary: null,
+  color: 'red',
 });
+
+const availableColors = ['blue', 'green', 'orange', 'pink', 'purple', 'red', 'turquoise', 'yellow'];
 
 const handleLogin = async () => {
   await auth.login({ username: loginForm.username, password: loginForm.password });
@@ -73,8 +69,6 @@ const handleLogin = async () => {
 };
 
 const handleSignup = async () => {
-  // color_primary = tshirt_color, for now
-  signupForm.color_primary = signupForm.tshirt_color;
   await auth.signup(signupForm);
   if (!auth.user) return;
 
@@ -102,6 +96,24 @@ const handleSignup = async () => {
 
 .character p {
   margin: 10px 0 5px;
+}
+
+.color-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.color-option {
+  width: 30px;
+  height: 30px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.color-option.selected {
+  border-color: #000;
 }
 
 input[type="text"], input[type="password"], input[type="email"], input[type="color"] {

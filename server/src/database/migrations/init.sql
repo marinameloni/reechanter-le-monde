@@ -9,12 +9,7 @@ CREATE TABLE player (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
 
-  character_gender TEXT CHECK(character_gender IN ('female', 'male')),
-  hair_color TEXT,
-  tshirt_color TEXT,
-  color_primary TEXT,
-  color_secondary TEXT,
-  color_tertiary TEXT,
+  color TEXT,
 
   x INTEGER DEFAULT 0,
   y INTEGER DEFAULT 0,

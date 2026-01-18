@@ -19,31 +19,11 @@ export class GameRoom extends Room {
       // Colyseus se charge de synchroniser l'état avec tous les clients
     });
 
-    // Mise à jour de la couleur du joueur (personnalisation temps réel)
-    this.onMessage("updateColor", async (client, data) => {
-      if (!data || typeof data.color_primary !== "string") {
-        return;
-      }
-
-      const player = this.state.clients.find(
-        (c) => c.sessionId === client.sessionId
-      );
-      if (!player) return;
-
-      player.color_primary = data.color_primary;
-
-      // diffuse la nouvelle couleur à tous les clients
-      this.broadcast("clients", this.state.clients);
-
-      // Persiste également la couleur dans la base
-      try {
-        const db = await openDB();
-        await db.run(
-          `UPDATE player SET color_primary = ? WHERE username = ?;`,
-          [player.color_primary, player.username]
-        );
-      } catch (err) {
-        console.error("Failed to persist player color", err);
+    this.onMessage("updateColor", (client, data) => {
+      const player = this.state.clients.find(c => c.sessionId === client.sessionId);
+      if (player && data.color) {
+        player.color = data.color;
+        this.broadcast("clients", this.state.clients);
       }
     });
 
@@ -84,20 +64,20 @@ export class GameRoom extends Room {
     // position et couleur de départ depuis la DB si possible
     let startX = 1;
     let startY = 1;
-    let colorPrimary = "#D674CB";
+    let color = null;
 
     try {
       const db = await openDB();
       const row = await db.get(
-        `SELECT x, y, color_primary FROM player WHERE username = ?`,
+        `SELECT x, y, color FROM player WHERE username = ?`,
         [username]
       );
 
       if (row) {
         if (typeof row.x === "number") startX = row.x;
         if (typeof row.y === "number") startY = row.y;
-        if (typeof row.color_primary === "string" && row.color_primary.length) {
-          colorPrimary = row.color_primary;
+        if (typeof row.color === "string" && row.color.length) {
+          color = row.color;
         }
       }
     } catch (err) {
@@ -109,7 +89,7 @@ export class GameRoom extends Room {
       username,
       x: startX,
       y: startY,
-      color_primary: colorPrimary,
+      color: color,
     });
 
     // diffuse la liste complète à tous les clients

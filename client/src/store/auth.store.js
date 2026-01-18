@@ -3,7 +3,7 @@ import api from '../services/api';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    user: null,      // { id, username, role, character_gender, hair_color, tshirt_color, ... }
+    user: null,      // { id, username, role, color, ... }
     token: null,     // JWT renvoyé par le backend
     isAdmin: false,  // dérivé de user.role === 'admin'
     error: null,     // dernier message d'erreur login/signup

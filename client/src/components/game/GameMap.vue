@@ -16,7 +16,7 @@
 				:x="playerX"
 				:y="playerY"
 				:name="auth.user?.username || ''"
-				:color-primary="auth.user?.color_primary || auth.user?.tshirt_color || auth.user?.hair_color || '#D674CB'"
+				:color="auth.user?.color"
 				:direction="playerDirection"
 				:is-walking="isWalking"
 			/>
@@ -27,7 +27,7 @@
 				:x="p.x ?? 1"
 				:y="p.y ?? 1"
 				:name="p.username"
-				:color-primary="p.color_primary || '#D674CB'"
+				:color="p.color"
 			/>
 			<div
 				v-if="activeFactory"

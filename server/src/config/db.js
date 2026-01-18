@@ -51,6 +51,18 @@ export async function openDB() {
     await db.exec("ALTER TABLE player ADD COLUMN role TEXT DEFAULT 'user';");
   }
 
+  // S'assure que la colonne "color" existe dans player
+  const hasColorColumn = columns.some((c) => c.name === 'color');
+  if (!hasColorColumn) {
+    await db.exec("ALTER TABLE player ADD COLUMN color TEXT;");
+    
+    // Si l'ancienne colonne "color_primary" existe, on migre les données
+    const hasOldColorColumn = columns.some((c) => c.name === 'color_primary');
+    if (hasOldColorColumn) {
+      await db.exec("UPDATE player SET color = color_primary;");
+    }
+  }
+
   // S'assure que les colonnes bricks / rocks existent dans inventory
   const inventoryColumns = await db.all("PRAGMA table_info('inventory');");
   const hasBricksColumn = inventoryColumns.some((c) => c.name === 'bricks');

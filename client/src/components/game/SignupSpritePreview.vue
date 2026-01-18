@@ -1,47 +1,42 @@
 <template>
-  <div class="svg-preview" ref="svgContainer" v-html="spriteSvg"></div>
+  <div class="svg-preview" v-html="spriteSvg"></div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, nextTick } from 'vue';
-import frontSvg from '../../assets/sprites/front.svg?raw';
+import { ref, watch, onMounted } from 'vue';
 
 const props = defineProps({
-  hairColor: { type: String, default: '#000000' },
-  tshirtColor: { type: String, default: '#ffffff' },
+  color: { type: String, default: null },
 });
 
-const svgContainer = ref(null);
-const spriteSvg = frontSvg;
+const spriteSvg = ref('');
 
-const PRIMARY_IDS = ['id2', 'id3'];
-const HAIR_IDS = ['id1'];
+const spriteModules = import.meta.glob('../../assets/sprites/**/front.svg?raw');
 
-function applyColors() {
-  const root = svgContainer.value;
-  if (!root) return;
-  // Hair
-  HAIR_IDS.forEach((id) => {
-    const el = root.querySelector(`#${id}`);
-    if (el) {
-      el.style.fill = props.hairColor;
-    }
-  });
-  // T-shirt (main color)
-  PRIMARY_IDS.forEach((id) => {
-    const el = root.querySelector(`#${id}`);
-    if (el) {
-      el.style.fill = props.tshirtColor;
-    }
-  });
-}
+const getSpriteModule = (color) => {
+  const path = color ? `../../assets/sprites/${color}/front.svg?raw` : `../../assets/sprites/front.svg?raw`;
+  return spriteModules[path];
+};
 
-onMounted(async () => {
-  await nextTick();
-  applyColors();
+const loadSprite = async (color) => {
+  let getModule = getSpriteModule(color);
+  if (!getModule) {
+    getModule = getSpriteModule(null);
+  }
+
+  if (getModule) {
+    const module = await getModule();
+    spriteSvg.value = module.default;
+  }
+};
+
+onMounted(() => {
+  loadSprite(props.color);
 });
 
-watch(() => [props.hairColor, props.tshirtColor], applyColors);
+watch(() => props.color, (newColor) => {
+  loadSprite(newColor);
+});
 </script>
 
 <style scoped>
