@@ -1,4 +1,5 @@
 import { openDB } from '../config/db.js';
+import { buyTool, getInventoryWithTools } from '../services/game.service.js';
 
 export async function updateColor(req, res) {
   try {
@@ -35,5 +36,33 @@ export async function updateColor(req, res) {
   } catch (err) {
     console.error('Failed to update player color', err);
     res.status(500).json({ success: false, message: 'Failed to update color' });
+  }
+}
+
+export async function getInventory(req, res) {
+  try {
+    const playerId = parseInt(req.params.playerId, 10);
+    if (!playerId) {
+      return res.status(400).json({ success: false, message: 'playerId is required' });
+    }
+    const inv = await getInventoryWithTools(playerId);
+    res.json({ success: true, inventory: inv });
+  } catch (err) {
+    console.error('Failed to get inventory', err);
+    res.status(500).json({ success: false, message: 'Failed to get inventory' });
+  }
+}
+
+export async function buyToolController(req, res) {
+  try {
+    const { playerId, type, costBricks = 0, costRocks = 0 } = req.body || {};
+    if (!playerId || !type) {
+      return res.status(400).json({ success: false, message: 'playerId and type are required' });
+    }
+    const inv = await buyTool({ playerId, type, costBricks, costRocks });
+    res.json({ success: true, inventory: inv });
+  } catch (err) {
+    const code = err.message === 'Insufficient resources' ? 400 : 500;
+    res.status(code).json({ success: false, message: err.message || 'Failed to buy tool' });
   }
 }

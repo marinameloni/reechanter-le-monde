@@ -27,8 +27,15 @@ export async function openDB() {
   );
 
   if (!row) {
-    const sql = await fs.readFile(migrationsPath, 'utf8');
-    await db.exec(sql);
+    try {
+      const sql = await fs.readFile(migrationsPath, 'utf8');
+      await db.exec(sql);
+    } catch (err) {
+      // If concurrent migration attempts occur, ignore "table already exists" errors
+      if (!String(err?.message || '').includes('already exists')) {
+        throw err;
+      }
+    }
   }
 
   // Seed base data (maps, tiles...) if map table is empty
