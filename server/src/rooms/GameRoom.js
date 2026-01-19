@@ -77,6 +77,15 @@ export class GameRoom extends Room {
       }
     });
 
+    // Chat: broadcast bubbly messages to all clients
+    this.onMessage("chatMessage", (client, data) => {
+      const from = this.state.clients.find(c => c.sessionId === client.sessionId);
+      const text = (data && typeof data.text === 'string') ? data.text.trim() : '';
+      if (!from || !text) return;
+      // Broadcast to everyone (including sender) to render bubbles
+      this.broadcast("chatMessage", { fromUsername: from.username, text });
+    });
+
     // Partner sends counter-offer back to proposer
     this.onMessage("tradeCounterOffer", (client, data) => {
       const from = this.state.clients.find(c => c.sessionId === client.sessionId);

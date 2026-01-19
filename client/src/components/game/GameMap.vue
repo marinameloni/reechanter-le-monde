@@ -27,6 +27,11 @@
 				:direction="playerDirection"
 				:is-walking="isWalking"
 			/>
+			<!-- My chat bubble -->
+			<div v-if="chatBubbles[auth.user?.username || '']" class="chat-bubble"
+			     :style="{ transform: `translate(${playerX * map.tileSize}px, ${(playerY * map.tileSize) - 40}px)` }">
+				{{ chatBubbles[auth.user?.username || '']?.text }}
+			</div>
 			<PlayerSprite
 				v-for="p in otherPlayers"
 				:key="p.sessionId"
@@ -44,6 +49,15 @@
 				:style="{ width: map.tileSize + 'px', height: map.tileSize + 'px', transform: `translate(${(p.x ?? 1) * map.tileSize}px, ${(p.y ?? 1) * map.tileSize}px)` }"
 				@click="openPlayerCard(p)"
 			></div>
+			<!-- Other players chat bubbles -->
+			<div
+				v-for="p in bubblePlayers"
+				:key="p.sessionId + '-bubble'"
+				class="chat-bubble"
+				:style="{ transform: `translate(${(p.x ?? 1) * map.tileSize}px, ${((p.y ?? 1) * map.tileSize) - 40}px)` }"
+			>
+				{{ chatBubbles[p.username]?.text }}
+			</div>
 			<div
 				v-if="activeFactory"
 				class="factory-progress"
@@ -66,9 +80,13 @@
 				</span>
 			</p>
 			<p class="controls">
-				Use arrow keys or WASD to move.
+				Use arrow keys to move.
 				Press Space or E to interact with factories/ruins.
 			</p>
+			<div class="chat-input">
+				<input type="text" v-model.trim="chatInput" placeholder="Say something..." @keydown.enter="sendChat" />
+				<button class="btn" @click="sendChat">Send</button>
+			</div>
 		</div>
 
 		<!-- Simple Exchange Modal -->
@@ -445,6 +463,9 @@ const otherPlayers = computed(() => {
 	);
 });
 
+// Players currently showing bubbles
+const bubblePlayers = computed(() => otherPlayers.value.filter(p => !!chatBubbles.value[p.username]));
+
 // Player card modal state
 const showPlayerCard = ref(false);
 const selectedPlayer = ref(null);
@@ -536,6 +557,10 @@ function registerRoomHandlers() {
 		showFinalConfirm.value = false;
 		finalOffer.value = null;
 	});
+	gameStore.room.onMessage('chatMessage', (data) => {
+		if (!data || !data.fromUsername || !data.text) return;
+		showBubble(data.fromUsername, data.text);
+	});
 	roomHandlersBound.value = true;
 }
 
@@ -604,6 +629,38 @@ function declineIncomingOffer() {
 	gameStore.room.send('tradeOfferResponse', { toUsername: incomingOffer.value.fromUsername, accepted: false });
 	incomingOffer.value = null;
 	waitingPartnerConfirm.value = false;
+}
+
+// Chat state
+const chatInput = ref('');
+const chatBubbles = ref({}); // { username: { text } }
+const chatTimers = new Map();
+
+function showBubble(username, text) {
+	if (!username) return;
+	chatBubbles.value[username] = { text };
+	const existing = chatTimers.get(username);
+	if (existing) clearTimeout(existing);
+	const t = setTimeout(() => {
+		// remove bubble after 6 seconds
+		const current = chatBubbles.value;
+		if (current[username]) {
+			delete current[username];
+		}
+		chatTimers.delete(username);
+	}, 6000);
+	chatTimers.set(username, t);
+}
+
+function sendChat() {
+	const text = (chatInput.value || '').trim();
+	if (!text || !gameStore.room) return;
+	try {
+		gameStore.room.send('chatMessage', { text });
+		chatInput.value = '';
+	} catch (err) {
+		console.error('Failed to send chat', err);
+	}
 }
 function executeExchange() {
 	const aId = auth.user?.id; // proposer (me)
@@ -803,31 +860,19 @@ function buyItem(type) {
 }
 
 function handleKeyDown(event) {
-	if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') {
+	// Prevent movement when typing inside inputs/textareas
+	const tag = (event.target && event.target.tagName) || '';
+	if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+	if (event.key === 'ArrowUp') {
 		movePlayer(0, -1);
-	} else if (
-		event.key === 'ArrowDown' ||
-		event.key === 's' ||
-		event.key === 'S'
-	) {
+	} else if (event.key === 'ArrowDown') {
 		movePlayer(0, 1);
-	} else if (
-		event.key === 'ArrowLeft' ||
-		event.key === 'a' ||
-		event.key === 'A'
-	) {
+	} else if (event.key === 'ArrowLeft') {
 		movePlayer(-1, 0);
-	} else if (
-		event.key === 'ArrowRight' ||
-		event.key === 'd' ||
-		event.key === 'D'
-	) {
+	} else if (event.key === 'ArrowRight') {
 		movePlayer(1, 0);
-	} else if (
-		event.key === ' ' ||
-		event.key === 'e' ||
-		event.key === 'E'
-	) {
+	} else if (event.key === ' ' || event.key === 'e' || event.key === 'E') {
 		interact();
 	}
 }
@@ -916,6 +961,45 @@ onBeforeUnmount(() => {
 	image-rendering: pixelated;
 	z-index: 9;
 	pointer-events: none;
+}
+
+.chat-bubble {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 13;
+	max-width: 180px;
+	padding: 6px 8px;
+	border-radius: 12px;
+	background: rgba(255,255,255,0.95);
+	color: #222;
+	font-size: 12px;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+	pointer-events: none;
+}
+.chat-bubble::after {
+	content: '';
+	position: absolute;
+	bottom: -6px;
+	left: 12px;
+	width: 0;
+	height: 0;
+	border-left: 6px solid transparent;
+	border-right: 6px solid transparent;
+	border-top: 6px solid rgba(255,255,255,0.95);
+}
+
+.chat-input {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	margin-top: 6px;
+}
+.chat-input input[type='text'] {
+	flex: 1;
+	padding: 6px 8px;
+	border: 1px solid #ccc;
+	border-radius: 6px;
 }
 
 .hud {

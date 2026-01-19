@@ -28,10 +28,10 @@ const props = defineProps({
 // ref pour le SVG
 const spriteSvg = ref('');
 
-// glob Vite pour charger tous les SVG en raw string
+// glob Vite pour charger tous les SVG en raw string (Vite 7 format)
 const sprites = import.meta.glob(
   '/src/assets/sprites/**/*.svg',
-  { as: 'raw', eager: true }
+  { query: '?raw', import: 'default', eager: true }
 );
 
 // quelle frame afficher selon la direction et si le joueur marche
