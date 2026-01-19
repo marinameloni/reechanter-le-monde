@@ -41,7 +41,7 @@ export async function signup(req, res) {
     );
 
     const token = jwt.sign({ id_player: player.id_player, username: player.username }, SECRET, {
-      expiresIn: '1h',
+      expiresIn: '1d',
     });
 
     res.json({
@@ -114,7 +114,7 @@ export async function login(req, res) {
     }
 
     const token = jwt.sign({ id_player: player.id_player, username: player.username }, SECRET, {
-      expiresIn: '1h',
+      expiresIn: '1d',
     });
 
     res.json({
