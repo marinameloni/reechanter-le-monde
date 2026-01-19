@@ -86,6 +86,37 @@ export class GameRoom extends Room {
       this.broadcast("chatMessage", { fromUsername: from.username, text });
     });
 
+    // Shared factory clicks per map
+    this.onMessage("factoryClick", async (client, data) => {
+      const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
+      const mapId = (data && typeof data.mapId === 'number') ? data.mapId : 1;
+      try {
+        const db = await openDB();
+        await db.exec('BEGIN TRANSACTION;');
+        const row = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = ?;', mapId);
+        if (!row) {
+          // initialize if not existing
+          await db.run('INSERT INTO factory_progress (id_map, clicks_current, clicks_required) VALUES (?, 0, 500);', mapId);
+        }
+        await db.run(
+          `UPDATE factory_progress
+           SET clicks_current = clicks_current + ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id_map = ?;`,
+          [inc, mapId]
+        );
+        const updated = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = ?;', mapId);
+        await db.exec('COMMIT;');
+
+        // Broadcast updated progress to all
+        this.broadcast('factoryProgress', { mapId, clicksCurrent: updated.clicks_current || 0, clicksRequired: updated.clicks_required || 500 });
+        if ((updated.clicks_current || 0) >= (updated.clicks_required || 500)) {
+          this.broadcast('mapUnlocked', { mapId: mapId + 1 });
+        }
+      } catch (err) {
+        console.error('Failed to update factory progress', err);
+      }
+    });
+
     // Partner sends counter-offer back to proposer
     this.onMessage("tradeCounterOffer", (client, data) => {
       const from = this.state.clients.find(c => c.sessionId === client.sessionId);
@@ -125,12 +156,12 @@ export class GameRoom extends Room {
       // diffuse les nouvelles positions à tous les clients
       this.broadcast("clients", this.state.clients);
 
-      // Persiste également la position dans la base (player.x / player.y / id_map)
+      // Persiste également la position dans la base (player.x / player.y)
       try {
         const db = await openDB();
         await db.run(
-          `UPDATE player SET x = ?, y = ?, id_map = ? WHERE username = ?;`,
-          [player.x, player.y, 1, player.username]
+          `UPDATE player SET x = ?, y = ? WHERE username = ?;`,
+          [player.x, player.y, player.username]
         );
       } catch (err) {
         console.error("Failed to persist player position", err);
@@ -180,6 +211,17 @@ export class GameRoom extends Room {
 
     // diffuse la liste complète à tous les clients
     this.broadcast("clients", this.state.clients);
+
+    // Send current factory progress (for all maps) to the newly joined client
+    try {
+      const db = await openDB();
+      const rows = await db.all('SELECT id_map, clicks_current, clicks_required FROM factory_progress;');
+      for (const row of rows || []) {
+        client.send('factoryProgress', { mapId: row.id_map, clicksCurrent: row.clicks_current || 0, clicksRequired: row.clicks_required || 0 });
+      }
+    } catch (err) {
+      console.error('Failed to load factory progress on join', err);
+    }
   }
 
   onLeave(client, consented) {

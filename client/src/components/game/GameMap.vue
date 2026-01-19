@@ -1,12 +1,12 @@
 <template>
 	<div class="game-map">
 		<div class="map-wrapper" :style="wrapperStyle">
-			<img :src="mapImage" :alt="map.name" class="map-image" />
+			<img :src="mapImage" :alt="mapObj.name" class="map-image" />
 			<div class="tiles-overlay" :style="gridStyle">
 				<Tile
 					v-for="tile in gridTiles"
 					:key="tile.id"
-					:size="map.tileSize"
+					:size="mapObj.tileSize"
 					:blocked="isBlocked(tile.x, tile.y)"
 					@click="handleTileClick(tile)"
 				/>
@@ -16,10 +16,17 @@
 				:src="npcImg"
 				alt="NPC Exchanger"
 				class="npc-sprite"
-				:style="{ transform: `translate(${npcX * map.tileSize}px, ${npcY * map.tileSize}px)` }"
+				:style="{ transform: `translate(${npcX * mapObj.tileSize}px, ${npcY * mapObj.tileSize}px)` }"
+			/>
+			<!-- Gate overlay (only on Map 1) -->
+			<img v-if="activeMapId === 1"
+				:src="gateImg"
+				alt="Gate"
+				class="gate-sprite"
+				:style="{ transform: `translate(${gateX * mapObj.tileSize - 8}px, ${gateY * mapObj.tileSize - 16}px)` }"
 			/>
 			<PlayerSprite
-				:tile-size="map.tileSize"
+				:tile-size="mapObj.tileSize"
 				:x="playerX"
 				:y="playerY"
 				:name="auth.user?.username || ''"
@@ -29,13 +36,13 @@
 			/>
 			<!-- My chat bubble -->
 			<div v-if="chatBubbles[auth.user?.username || '']" class="chat-bubble"
-			     :style="{ transform: `translate(${playerX * map.tileSize}px, ${(playerY * map.tileSize) - 40}px)` }">
+		     :style="{ transform: `translate(${playerX * mapObj.tileSize}px, ${(playerY * mapObj.tileSize) - 40}px)` }">
 				{{ chatBubbles[auth.user?.username || '']?.text }}
 			</div>
 			<PlayerSprite
 				v-for="p in otherPlayers"
 				:key="p.sessionId"
-				:tile-size="map.tileSize"
+				:tile-size="mapObj.tileSize"
 				:x="p.x ?? 1"
 				:y="p.y ?? 1"
 				:name="p.username"
@@ -46,7 +53,7 @@
 				v-for="p in otherPlayers"
 				:key="p.sessionId + '-click'"
 				class="player-click"
-				:style="{ width: map.tileSize + 'px', height: map.tileSize + 'px', transform: `translate(${(p.x ?? 1) * map.tileSize}px, ${(p.y ?? 1) * map.tileSize}px)` }"
+				:style="{ width: mapObj.tileSize + 'px', height: mapObj.tileSize + 'px', transform: `translate(${(p.x ?? 1) * mapObj.tileSize}px, ${(p.y ?? 1) * mapObj.tileSize}px)` }"
 				@click="openPlayerCard(p)"
 			></div>
 			<!-- Other players chat bubbles -->
@@ -54,7 +61,7 @@
 				v-for="p in bubblePlayers"
 				:key="p.sessionId + '-bubble'"
 				class="chat-bubble"
-				:style="{ transform: `translate(${(p.x ?? 1) * map.tileSize}px, ${((p.y ?? 1) * map.tileSize) - 40}px)` }"
+				:style="{ transform: `translate(${(p.x ?? 1) * mapObj.tileSize}px, ${((p.y ?? 1) * mapObj.tileSize) - 40}px)` }"
 			>
 				{{ chatBubbles[p.username]?.text }}
 			</div>
@@ -62,16 +69,17 @@
 				v-if="activeFactory"
 				class="factory-progress"
 				:style="{
-					transform: `translate(${activeFactory.x * map.tileSize}px, ${
-						activeFactory.y * map.tileSize - 20
+					transform: `translate(${activeFactory.x * mapObj.tileSize}px, ${
+						activeFactory.y * mapObj.tileSize - 20
 					}px)`,
 				}"
 			>
-				{{ factoryClicks }} / {{ factoryClicksRequired }}
+				{{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}
 			</div>
 		</div>
 		<div class="hud">
 			<p>Position: ({{ playerX }}, {{ playerY }})</p>
+			<div v-if="bannerMessage" :class="['banner', bannerType]">{{ bannerMessage }}</div>
 			<p>
 				Bricks: {{ bricks }} | Rocks: {{ rocks }}
 				<span class="inventory">| Inventory: 
@@ -79,6 +87,7 @@
 					<img :src="shovelImg" alt="Shovel" class="inv-icon"/> x{{ shovels }}
 				</span>
 			</p>
+			<p>Factory Progress (shared): {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
 			<p class="controls">
 				Use arrow keys to move.
 				Press Space or E to interact with factories/ruins.
@@ -225,9 +234,12 @@ import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue';
 import { useAuthStore } from '../../store/auth.store';
 import { useGameStore } from '../../store/game.store';
 import api from '../../services/api';
-import map from '../../assets/maps/map1.json';
-import mapImage from '../../assets/maps/maplevel1.png';
+import map1 from '../../assets/maps/map1.json';
+import map2 from '../../assets/maps/map2.json';
+import mapImage1 from '../../assets/maps/maplevel1.png';
+import mapImage2 from '../../assets/maps/maplevel2.png';
 import npcImg from '../../assets/sprites/npc_exchanger.png';
+import gateImg from '../../assets/sprites/gate.png';
 import shovelImg from '../../assets/sprites/item_shovel.png';
 import wateringCanImg from '../../assets/sprites/item_wateringcan.png';
 import Tile from './Tile.vue';
@@ -236,24 +248,28 @@ import PlayerSprite from './PlayerSprite.vue';
 const auth = useAuthStore();
 const gameStore = useGameStore();
 
-const wrapperStyle = {
-	width: map.width * map.tileSize + 'px',
-	height: map.height * map.tileSize + 'px',
-};
+const activeMapId = ref(1);
+const mapObj = computed(() => (activeMapId.value === 1 ? map1 : map2));
+const mapImage = computed(() => (activeMapId.value === 1 ? mapImage1 : mapImage2));
 
-const gridStyle = {
+const wrapperStyle = computed(() => ({
+	width: mapObj.value.width * mapObj.value.tileSize + 'px',
+	height: mapObj.value.height * mapObj.value.tileSize + 'px',
+}));
+
+const gridStyle = computed(() => ({
 	display: 'grid',
-	gridTemplateColumns: `repeat(${map.width}, ${map.tileSize}px)`,
-	gridTemplateRows: `repeat(${map.height}, ${map.tileSize}px)`,
+	gridTemplateColumns: `repeat(${mapObj.value.width}, ${mapObj.value.tileSize}px)`,
+	gridTemplateRows: `repeat(${mapObj.value.height}, ${mapObj.value.tileSize}px)`,
 	width: '100%',
 	height: '100%',
-};
-
-const gridTiles = Array.from({ length: map.width * map.height }, (_, index) => ({
-	id: index,
-	x: index % map.width,
-	y: Math.floor(index / map.width),
 }));
+
+const gridTiles = computed(() => Array.from({ length: mapObj.value.width * mapObj.value.height }, (_, index) => ({
+	id: index,
+	x: index % mapObj.value.width,
+	y: Math.floor(index / mapObj.value.width),
+})));
 
 const unwalkableCoords = [
 	[8, 0],
@@ -448,6 +464,8 @@ const factorySet = new Set(factoryCoords.map(([x, y]) => `${x},${y}`));
 const debrisSet = new Set(debrisCoords.map(([x, y]) => `${x},${y}`));
 const npcX = 25;
 const npcY = 13;
+const gateX = 19;
+const gateY = 0;
 
 const playerX = ref(1);
 const playerY = ref(1);
@@ -467,8 +485,12 @@ const offers = ref({
 	shovel: { bricks: 0, rocks: 0 },
 });
 
-const factoryClicks = ref(0);
-const factoryClicksRequired = 300;
+const factoryLocalClicks = ref(0);
+const factoryProgressByMap = ref({}); // { [mapId]: { current, required } }
+const currentFactoryProgress = computed(() => {
+	const p = factoryProgressByMap.value[activeMapId.value] || { current: 0, required: activeMapId.value === 1 ? 500 : 1000 };
+	return p;
+});
 const activeFactory = ref(null);
 
 function isDestroyed(x, y) {
@@ -579,6 +601,17 @@ function registerRoomHandlers() {
 	gameStore.room.onMessage('chatMessage', (data) => {
 		if (!data || !data.fromUsername || !data.text) return;
 		showBubble(data.fromUsername, data.text);
+	});
+	gameStore.room.onMessage('factoryProgress', (data) => {
+		if (!data || typeof data.mapId !== 'number') return;
+		const m = data.mapId;
+		const cur = typeof data.clicksCurrent === 'number' ? data.clicksCurrent : 0;
+		const req = typeof data.clicksRequired === 'number' ? data.clicksRequired : 0;
+		factoryProgressByMap.value = { ...factoryProgressByMap.value, [m]: { current: cur, required: req } };
+	});
+	gameStore.room.onMessage('mapUnlocked', (data) => {
+		const nextId = data?.mapId;
+		if (nextId) showBanner(`Map ${nextId} unlocked!`, 'success');
 	});
 	roomHandlersBound.value = true;
 }
@@ -705,6 +738,20 @@ function cancelFinal() {
 	showFinalConfirm.value = false;
 	finalOffer.value = null;
 }
+
+// Small banner helper for user feedback
+const bannerMessage = ref('');
+const bannerType = ref(''); // '', 'success', 'warning', 'error'
+let bannerTimer = null;
+function showBanner(msg, type = '') {
+	bannerMessage.value = msg;
+	bannerType.value = type;
+	if (bannerTimer) clearTimeout(bannerTimer);
+	bannerTimer = setTimeout(() => {
+		bannerMessage.value = '';
+		bannerType.value = '';
+	}, 3000);
+}
 function isBlocked(x, y) {
 	const key = `${x},${y}`;
 	return unwalkableSet.has(key) && !isDestroyed(x, y);
@@ -726,20 +773,20 @@ async function sendProgress({ deltaBricks = 0, deltaRocks = 0, deltaWorldScore =
 }
 
 function doFactoryClick(x, y) {
-	if (factoryClicks.value >= factoryClicksRequired) return;
 	activeFactory.value = { x, y };
-	factoryClicks.value += clickMultiplier.value;
-	if (factoryClicks.value % 20 === 0) {
+	// Local resource reward every 20 local clicks
+	factoryLocalClicks.value += clickMultiplier.value;
+	if (factoryLocalClicks.value % 20 === 0) {
 		bricks.value += 1;
-		// Persist 1 brick gained and 1 point of world progress
 		sendProgress({ deltaBricks: 1, deltaWorldScore: 1 });
 	}
-	if (factoryClicks.value >= factoryClicksRequired) {
-		factoryCoords.forEach(([fx, fy]) => {
-			if (!isDestroyed(fx, fy)) {
-				destroyedTiles.value.push({ x: fx, y: fy });
-			}
-		});
+	// Send shared increment to server so everyone sees the same total
+	if (gameStore.room) {
+		try {
+			gameStore.room.send('factoryClick', { mapId: activeMapId.value, inc: clickMultiplier.value });
+		} catch (err) {
+			console.error('Failed to send factoryClick', err);
+		}
 	}
 }
 
@@ -785,8 +832,8 @@ function movePlayer(deltaX, deltaY) {
 	if (
 		targetX < 0 ||
 		targetY < 0 ||
-		targetX >= map.width ||
-		targetY >= map.height
+		targetX >= mapObj.value.width ||
+		targetY >= mapObj.value.height
 	) {
 		return;
 	}
@@ -795,6 +842,11 @@ function movePlayer(deltaX, deltaY) {
 	}
 	playerX.value = targetX;
 	playerY.value = targetY;
+
+	// Travel if standing on gate tile (requires shared threshold reached)
+	if (playerX.value === gateX && playerY.value === gateY) {
+		tryTravelToMap2();
+	}
 	setTimeout(() => { isWalking.value = false; }, 200); // reset walk anim after 200ms
 
 	if (gameStore.room) {
@@ -828,6 +880,11 @@ function interact() {
 	}
 	if (factorySet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
 		doFactoryClick(playerX.value, playerY.value);
+		return;
+	}
+	// Also allow interact on gate
+	if (playerX.value === gateX && playerY.value === gateY) {
+		tryTravelToMap2();
 		return;
 	}
 	if (debrisSet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
@@ -933,6 +990,33 @@ onMounted(async () => {
 onBeforeUnmount(() => {
 	window.removeEventListener('keydown', handleKeyDown);
 });
+
+async function tryTravelToMap2() {
+	// Optional gate lock: require shared progress threshold
+	if (currentFactoryProgress.value.current < currentFactoryProgress.value.required) {
+		showBanner(`Gate locked: ${currentFactoryProgress.value.current}/${currentFactoryProgress.value.required} clicks`, 'warning');
+		return;
+	}
+	const playerId = auth.user?.id;
+	if (!playerId) return;
+	try {
+		// Move player to map 2, reset position to (1,1)
+		await api.post('/api/player/travel', { playerId, mapId: 2, x: 1, y: 1 });
+		// Update local position immediately
+		playerX.value = 1;
+		playerY.value = 1;
+		// Notify room so others see new position (server still uses single room model)
+		if (gameStore.room) {
+			try {
+				gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
+			} catch (err) {}
+		}
+		activeMapId.value = 2;
+		showBanner('Traveled to Map 2!', 'success');
+	} catch (err) {
+		console.error('Failed to travel to map 2', err);
+	}
+}
 </script>
 
 <style scoped>
@@ -982,6 +1066,17 @@ onBeforeUnmount(() => {
 	pointer-events: none;
 }
 
+.gate-sprite {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 48px;
+	height: 48px;
+	image-rendering: pixelated;
+	z-index: 9;
+	pointer-events: none;
+}
+
 .chat-bubble {
 	position: absolute;
 	top: 0;
@@ -1026,6 +1121,16 @@ onBeforeUnmount(() => {
 	font-size: 0.9rem;
 	color: #555;
 }
+
+.banner {
+	margin: 6px 0;
+	padding: 6px 8px;
+	border-radius: 6px;
+	font-size: 0.85rem;
+}
+.banner.success { background: #e6ffed; color: #035c1a; border: 1px solid #b8f7c7; }
+.banner.warning { background: #fff8e1; color: #7a5600; border: 1px solid #ffe3a3; }
+.banner.error { background: #ffeaea; color: #7a0000; border: 1px solid #ffb0b0; }
 
 .controls {
 	font-size: 0.8rem;

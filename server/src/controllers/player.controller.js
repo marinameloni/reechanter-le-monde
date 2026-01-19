@@ -66,3 +66,25 @@ export async function buyToolController(req, res) {
     res.status(code).json({ success: false, message: err.message || 'Failed to buy tool' });
   }
 }
+
+export async function travel(req, res) {
+  try {
+    const { playerId, mapId, x = 1, y = 1 } = req.body || {};
+    if (!playerId || !mapId) {
+      return res.status(400).json({ success: false, message: 'playerId and mapId are required' });
+    }
+
+    const db = await openDB();
+    await db.run(
+      `UPDATE player SET id_map = ?, x = ?, y = ? WHERE id_player = ?;`,
+      [mapId, x, y, playerId]
+    );
+
+    const updated = await db.get('SELECT id_player, id_map, x, y FROM player WHERE id_player = ?;', [playerId]);
+    if (!updated) return res.status(404).json({ success: false, message: 'Player not found' });
+    res.json({ success: true, player: updated });
+  } catch (err) {
+    console.error('Failed to travel', err);
+    res.status(500).json({ success: false, message: 'Failed to travel' });
+  }
+}

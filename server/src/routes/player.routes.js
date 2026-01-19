@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { updateColor, getInventory, buyToolController } from '../controllers/player.controller.js';
+import { updateColor, getInventory, buyToolController, travel } from '../controllers/player.controller.js';
 
 const router = Router();
 
@@ -7,5 +7,6 @@ const router = Router();
 router.post('/color', updateColor);
 router.get('/inventory/:playerId', getInventory);
 router.post('/tools/buy', buyToolController);
+router.post('/travel', travel);
 
 export default router;

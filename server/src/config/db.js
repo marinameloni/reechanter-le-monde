@@ -81,5 +81,26 @@ export async function openDB() {
     await db.exec("ALTER TABLE inventory ADD COLUMN rocks INTEGER DEFAULT 0;");
   }
 
+  // Ensure factory_progress table exists for shared factory clicks per map
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS factory_progress (
+      id_map INTEGER PRIMARY KEY,
+      clicks_current INTEGER DEFAULT 0,
+      clicks_required INTEGER NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (id_map) REFERENCES map(id_map)
+    );
+  `);
+  // Seed map 1 progress if missing (default required: 500)
+  const prog = await db.get('SELECT id_map FROM factory_progress WHERE id_map = 1;');
+  if (!prog) {
+    await db.run('INSERT INTO factory_progress (id_map, clicks_current, clicks_required) VALUES (1, 0, 500);');
+  }
+  // Seed map 2 progress if missing (default required: 1000)
+  const prog2 = await db.get('SELECT id_map FROM factory_progress WHERE id_map = 2;');
+  if (!prog2) {
+    await db.run('INSERT INTO factory_progress (id_map, clicks_current, clicks_required) VALUES (2, 0, 1000);');
+  }
+
   return db;
 }
