@@ -3,6 +3,9 @@ import { openDB } from "../config/db.js";
 
 export class GameRoom extends Room {
   onCreate(options) {
+    // Persist mapId for this room instance (per-map room)
+    this.mapId = typeof options?.mapId === 'number' ? options.mapId : 1;
+
     // État minimal pour commencer : sera enrichi plus tard
     this.setState({
       tiles: [],
@@ -89,7 +92,7 @@ export class GameRoom extends Room {
     // Shared factory clicks per map
     this.onMessage("factoryClick", async (client, data) => {
       const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
-      const mapId = (data && typeof data.mapId === 'number') ? data.mapId : 1;
+      const mapId = this.mapId ?? 1;
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');
@@ -120,7 +123,7 @@ export class GameRoom extends Room {
     // Shared watering per tile on Map 3 (former factory tiles)
     this.onMessage("waterTile", async (client, data) => {
       const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
-      const mapId = (data && typeof data.mapId === 'number') ? data.mapId : 3;
+      const mapId = this.mapId ?? 3;
       const x = (data && typeof data.x === 'number') ? data.x : null;
       const y = (data && typeof data.y === 'number') ? data.y : null;
       if (mapId !== 3 || x == null || y == null) return;
@@ -161,8 +164,9 @@ export class GameRoom extends Room {
     this.onMessage("buildFence", async (client, data) => {
       const x = (data && typeof data.x === 'number') ? data.x : null;
       const y = (data && typeof data.y === 'number') ? data.y : null;
-      const mapId = 4;
+      const mapId = this.mapId ?? 4;
       if (x == null || y == null) return;
+      if (mapId !== 4) return; // only valid in Map 4 room
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');
@@ -246,19 +250,20 @@ export class GameRoom extends Room {
   }
 
   async onJoin(client, options) {
-    console.log(`${client.sessionId} joined GameRoom`);
+    console.log(`${client.sessionId} joined GameRoom(mapId=${this.mapId})`);
 
     const username = options?.username || client.sessionId;
     // position et couleur de départ depuis la DB si possible
     let startX = 1;
     let startY = 1;
     let color = null;
+    let currentMapId = this.mapId;
 
     let playerRow = null;
     try {
       const db = await openDB();
       const row = await db.get(
-        `SELECT id_player, x, y, color FROM player WHERE username = ?`,
+        `SELECT id_player, id_map, x, y, color FROM player WHERE username = ?`,
         [username]
       );
       playerRow = row;
@@ -267,6 +272,9 @@ export class GameRoom extends Room {
         if (typeof row.y === "number") startY = row.y;
         if (typeof row.color === "string" && row.color.length) {
           color = row.color;
+        }
+        if (typeof row.id_map === 'number') {
+          currentMapId = row.id_map;
         }
       }
     } catch (err) {
@@ -288,32 +296,37 @@ export class GameRoom extends Room {
     // diffuse la liste complète à tous les clients
     this.broadcast("clients", this.state.clients);
 
-    // Send current factory progress (for all maps) to the newly joined client
+    // Send current progress for THIS map only
     try {
       const db = await openDB();
-      const rows = await db.all('SELECT id_map, clicks_current, clicks_required FROM factory_progress;');
-      for (const row of rows || []) {
-        client.send('factoryProgress', { mapId: row.id_map, clicksCurrent: row.clicks_current || 0, clicksRequired: row.clicks_required || 0 });
+      // Factory progress for current map
+      const fp = await db.get('SELECT id_map, clicks_current, clicks_required FROM factory_progress WHERE id_map = ?;', [this.mapId]);
+      if (fp) {
+        client.send('factoryProgress', { mapId: fp.id_map, clicksCurrent: fp.clicks_current || 0, clicksRequired: fp.clicks_required || 0 });
       }
-      // Also send current flower progress for map 3
-      const flowers = await db.all('SELECT id_map, tile_x, tile_y, water_current, water_required FROM flower_progress WHERE id_map = 3;');
-      for (const f of flowers || []) {
-        client.send('flowerProgress', { mapId: f.id_map, x: f.tile_x, y: f.tile_y, current: f.water_current || 0, required: f.water_required || 50 });
-        if ((f.water_current || 0) >= (f.water_required || 50)) {
-          client.send('tileFlowered', { mapId: f.id_map, x: f.tile_x, y: f.tile_y });
+      // Flower progress only if this is Map 3
+      if (this.mapId === 3) {
+        const flowers = await db.all('SELECT id_map, tile_x, tile_y, water_current, water_required FROM flower_progress WHERE id_map = 3;');
+        for (const f of flowers || []) {
+          client.send('flowerProgress', { mapId: f.id_map, x: f.tile_x, y: f.tile_y, current: f.water_current || 0, required: f.water_required || 50 });
+          if ((f.water_current || 0) >= (f.water_required || 50)) {
+            client.send('tileFlowered', { mapId: f.id_map, x: f.tile_x, y: f.tile_y });
+          }
         }
       }
-      // Send current fence progress for map 4
-      const fences = await db.all('SELECT id_map, tile_x, tile_y, built FROM fence_progress WHERE id_map = 4;');
-      let builtCount = 0, totalCount = 0;
-      for (const fc of fences || []) {
-        totalCount++;
-        if ((fc.built || 0) > 0) {
-          builtCount++;
-          client.send('fenceBuilt', { mapId: fc.id_map, x: fc.tile_x, y: fc.tile_y });
+      // Fence progress only if this is Map 4
+      if (this.mapId === 4) {
+        const fences = await db.all('SELECT id_map, tile_x, tile_y, built FROM fence_progress WHERE id_map = 4;');
+        let builtCount = 0, totalCount = 0;
+        for (const fc of fences || []) {
+          totalCount++;
+          if ((fc.built || 0) > 0) {
+            builtCount++;
+            client.send('fenceBuilt', { mapId: fc.id_map, x: fc.tile_x, y: fc.tile_y });
+          }
         }
+        client.send('fenceCount', { mapId: 4, built: builtCount, total: totalCount });
       }
-      client.send('fenceCount', { mapId: 4, built: builtCount, total: totalCount });
     } catch (err) {
       console.error('Failed to load factory progress on join', err);
     }

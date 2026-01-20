@@ -16,13 +16,13 @@ export const useGameStore = defineStore('game', {
 		error: null,
 	}),
 		actions: {
-			async connectToRoom(username) {
+			async connectToRoom(username, mapId = 1) {
 			if (this.connected) return;
 
 			try {
 				// Colyseus est servi via le même port HTTP que l'API (4000)
 				const client = new Client('ws://localhost:4000');
-				const room = await client.joinOrCreate('game_room', { username });
+				const room = await client.joinOrCreate('game_room', { username, mapId });
 
 				this.room = room;
 				this.connected = true;
@@ -42,6 +42,36 @@ export const useGameStore = defineStore('game', {
 			} catch (err) {
 				console.error('Failed to connect to Colyseus room', err);
 				this.error = 'Impossible de se connecter au serveur de jeu';
+			}
+		},
+
+		async switchRoom(username, mapId) {
+			try {
+				// Leave current room if connected
+				if (this.room) {
+					try { await this.room.leave(); } catch {}
+				}
+				this.room = null;
+				this.connected = false;
+
+				// Reconnect to target map room using same server
+				const client = new Client('ws://localhost:4000');
+				const room = await client.joinOrCreate('game_room', { username, mapId });
+				this.room = room;
+				this.connected = true;
+
+				// Basic state listeners
+				room.onStateChange((state) => {
+					this.tiles = state.tiles || [];
+					this.ruins = state.ruins || [];
+					this.buildings = state.buildings || [];
+				});
+				room.onMessage('clients', (clients) => {
+					this.clients = clients || [];
+				});
+			} catch (err) {
+				console.error('Failed to switch Colyseus room', err);
+				this.error = 'Impossible de changer de salle de jeu';
 			}
 		},
 

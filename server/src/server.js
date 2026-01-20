@@ -30,7 +30,10 @@ const gameServer = new ColyseusServer({
   transport: new WebSocketTransport({ server }),
 });
 
-gameServer.define('game_room', GameRoom);
+// Define a single room type filtered by mapId, creating one room per map
+gameServer
+  .define('game_room', GameRoom)
+  .filterBy(['mapId']);
 
 const PORT = 4000;
 gameServer.listen(PORT);

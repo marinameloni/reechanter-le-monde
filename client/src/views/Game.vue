@@ -87,7 +87,8 @@ const handleColorChange = async (newColor) => {
 };
 
 onMounted(async () => {
-	await game.connectToRoom(auth.user?.username);
+	// Connect initially to Map 1 room; GameMap will switch on travel
+	await game.connectToRoom(auth.user?.username, 1);
 });
 </script>
 

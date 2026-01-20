@@ -892,6 +892,7 @@ function registerRoomHandlers() {
 }
 
 watch(() => gameStore.room, (room) => {
+	roomHandlersBound.value = false;
 	if (room) registerRoomHandlers();
 });
 
@@ -1459,12 +1460,9 @@ async function tryTravelToMap2() {
 		// Update local position immediately
 		playerX.value = cx;
 		playerY.value = cy;
-		// Notify room so others see new position (server still uses single room model)
-		if (gameStore.room) {
-			try {
-				gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
-			} catch (err) {}
-		}
+		// Switch to per-map room and notify position there
+		await gameStore.switchRoom(auth.user?.username, 2);
+		try { gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value }); } catch (err) {}
 		activeMapId.value = 2;
 		showBanner('Traveled to Map 2!', 'success');
 	} catch (err) {
@@ -1488,11 +1486,8 @@ async function tryTravelToMap3() {
 		await api.post('/api/player/travel', { playerId, mapId: 3, x: cx, y: cy });
 		playerX.value = cx;
 		playerY.value = cy;
-		if (gameStore.room) {
-			try {
-				gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
-			} catch (err) {}
-		}
+		await gameStore.switchRoom(auth.user?.username, 3);
+		try { gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value }); } catch (err) {}
 		activeMapId.value = 3;
 		showBanner('Traveled to Map 3!', 'success');
 	} catch (err) {
@@ -1510,11 +1505,8 @@ async function tryTravelToMap4() {
 		await api.post('/api/player/travel', { playerId, mapId: 4, x: cx, y: cy });
 		playerX.value = cx;
 		playerY.value = cy;
-		if (gameStore.room) {
-			try {
-				gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
-			} catch (err) {}
-		}
+		await gameStore.switchRoom(auth.user?.username, 4);
+		try { gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value }); } catch (err) {}
 		activeMapId.value = 4;
 		showBanner('Traveled to Map 4!', 'success');
 	async function tryTravelToMap5() {
@@ -1527,11 +1519,8 @@ async function tryTravelToMap4() {
 			await api.post('/api/player/travel', { playerId, mapId: 5, x: cx, y: cy });
 			playerX.value = cx;
 			playerY.value = cy;
-			if (gameStore.room) {
-				try {
-					gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
-				} catch (err) {}
-			}
+			await gameStore.switchRoom(auth.user?.username, 5);
+			try { gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value }); } catch (err) {}
 			activeMapId.value = 5;
 			showBanner('Traveled to Map 5!', 'success');
 		} catch (err) {
