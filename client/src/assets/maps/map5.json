@@ -1,0 +1,7 @@
+{
+  "name": "Map 5",
+  "width": 32,
+  "height": 18,
+  "tileSize": 32,
+  "image": "maplevel5.png"
+}

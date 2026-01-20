@@ -9,6 +9,8 @@
 					:size="mapObj.tileSize"
 					:blocked="isBlocked(tile.x, tile.y)"
 					@click="handleTileClick(tile)"
+					@mouseenter="handleTileHover(tile)"
+					@mouseleave="clearTileHover"
 				/>
 			</div>
 			<!-- NPC exchanger overlay -->
@@ -25,6 +27,95 @@
 				class="gate-sprite"
 				:style="{ transform: `translate(${gateX * mapObj.tileSize - 8}px, ${gateY * mapObj.tileSize - 16}px)` }"
 			/>
+			<!-- Gate overlay (Map 2 -> Map 3) -->
+			<img v-if="activeMapId === 2"
+				:src="gateImg"
+				alt="Gate to Map 3"
+				class="gate-sprite"
+				:style="{ transform: `translate(${gate2X * mapObj.tileSize - 8}px, ${gate2Y * mapObj.tileSize - 16}px)` }"
+			/>
+			<!-- Gate overlay (Map 3 -> Map 4) -->
+			<img v-if="activeMapId === 3"
+				:src="gateImg"
+				alt="Gate to Map 4"
+				class="gate-sprite"
+				:style="{ transform: `translate(${gate3X * mapObj.tileSize - 8}px, ${gate3Y * mapObj.tileSize - 16}px)` }"
+			/>
+			<!-- Gate overlay (Map 4 -> Map 5) -->
+			<img v-if="activeMapId === 4"
+				:src="gateImg"
+				alt="Gate to Map 5"
+				class="portal-sprite"
+				:style="{ transform: `translate(${gate4X * mapObj.tileSize - 16}px, ${gate4Y * mapObj.tileSize - 32}px)` }"
+			/>
+			<!-- Gate overlay (Map 5 portal) -->
+			<img v-if="activeMapId === 5"
+				:src="gateImg"
+				alt="Portal"
+				class="portal-sprite"
+				:style="{ transform: `translate(${gate5X * mapObj.tileSize - 16}px, ${gate5Y * mapObj.tileSize - 32}px)` }"
+			/>
+			<!-- Flowers overlay (Map 3) -->
+			<template v-if="activeMapId === 3">
+				<img
+					v-for="key in floweredTileKeys"
+					:key="'flower-' + key"
+					:src="flowersImg"
+					alt="Flowers"
+					class="gate-sprite"
+					:style="{
+						transform: (() => {
+							const [fx, fy] = key.split(',').map(n => parseInt(n));
+							return `translate(${fx * mapObj.tileSize - 8}px, ${fy * mapObj.tileSize - 16}px)`;
+						})()
+					}"
+				/>
+				<!-- Shining overlay for tiles to water (Map 3) -->
+				<div
+					v-for="key in waterableTileKeys"
+					:key="'shine-' + key"
+					class="waterable-shine"
+					:style="{
+						width: mapObj.tileSize + 'px',
+						height: mapObj.tileSize + 'px',
+						transform: (() => {
+							const [sx, sy] = key.split(',').map(n => parseInt(n));
+							return `translate(${sx * mapObj.tileSize}px, ${sy * mapObj.tileSize}px)`;
+						})()
+					}"
+				></div>
+			</template>
+			<!-- Fences overlay and highlights (Map 4) -->
+			<template v-if="activeMapId === 4">
+				<!-- Built fences -->
+				<img
+					v-for="key in Array.from(fenceBuiltSet)"
+					:key="'fence-' + key"
+					:src="fenceImg"
+					alt="Fence"
+					class="gate-sprite"
+					:style="{
+						transform: (() => {
+							const [fx, fy] = key.split(',').map(n => parseInt(n));
+							return `translate(${fx * mapObj.tileSize - 8}px, ${fy * mapObj.tileSize - 16}px)`;
+						})()
+					}"
+				/>
+				<!-- Fence target highlights (unbuilt) -->
+				<div
+					v-for="key in map4FenceTargetKeys"
+					:key="'fence-target-' + key"
+					class="fence-target-shine"
+					:style="{
+						width: mapObj.tileSize + 'px',
+						height: mapObj.tileSize + 'px',
+						transform: (() => {
+							const [sx, sy] = key.split(',').map(n => parseInt(n));
+							return `translate(${sx * mapObj.tileSize}px, ${sy * mapObj.tileSize}px)`;
+						})()
+					}"
+				></div>
+			</template>
 			<PlayerSprite
 				:tile-size="mapObj.tileSize"
 				:x="playerX"
@@ -76,18 +167,37 @@
 			>
 				{{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}
 			</div>
+			<!-- Per-tile watering progress (Map 3) -->
+			<div
+				v-if="activeMapId === 3 && hoverTile && isFactoryTile(hoverTile.x, hoverTile.y)"
+				class="tile-progress"
+				:style="{ transform: `translate(${hoverTile.x * mapObj.tileSize}px, ${(hoverTile.y * mapObj.tileSize) - 20}px)` }"
+			>
+				{{ (flowerProgressByTile[`${hoverTile.x},${hoverTile.y}`] || 0) }} / 50
+			</div>
+
+			<!-- Flower particles -->
+			<div
+				v-for="p in flowerParticles"
+				:key="p.id"
+				class="flower-particle"
+				:style="{ transform: `translate(${p.x * mapObj.tileSize + p.ox}px, ${p.y * mapObj.tileSize + p.oy}px)` }"
+			></div>
 		</div>
 		<div class="hud">
 			<p>Position: ({{ playerX }}, {{ playerY }})</p>
 			<div v-if="bannerMessage" :class="['banner', bannerType]">{{ bannerMessage }}</div>
 			<p>
-				Bricks: {{ bricks }} | Rocks: {{ rocks }}
+				Bricks: {{ bricks }} | Rocks: {{ rocks }} | Wood: {{ wood }}
 				<span class="inventory">| Inventory: 
 					<img :src="wateringCanImg" alt="Watering Can" class="inv-icon"/> x{{ wateringCans }}
 					<img :src="shovelImg" alt="Shovel" class="inv-icon"/> x{{ shovels }}
+					<img v-if="fertilizers" :src="fertilizerImg" alt="Fertilizer" class="inv-icon"/> <span v-if="fertilizers">x{{ fertilizers }}</span>
 				</span>
 			</p>
-			<p>Factory Progress (shared): {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
+					<p v-if="activeMapId === 3">Flowers planted: {{ flowersPlanted }} / {{ flowersTotal }}</p>
+					<p v-else-if="activeMapId === 4">Fences built: {{ fencesBuiltCount }} / {{ fencesTotal }}</p>
+					<p v-else>Factory Progress (shared - {{ mapObj.name || ('Map ' + activeMapId) }}): {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
 			<p class="controls">
 				Use arrow keys to move.
 				Press Space or E to interact with factories/ruins.
@@ -129,6 +239,20 @@
 					@click="buyItem('shovel')"
 				>
 					Buy Shovel
+				</button>
+
+				<!-- Fertilizer (Map 3 only) -->
+				<p class="offer" v-if="activeMapId === 3">
+					<img :src="fertilizerImg" alt="Fertilizer" class="inv-icon"/> Fertilizer:
+					<span>{{ offers.fertilizer.bricks }} bricks + {{ offers.fertilizer.rocks }} rocks</span>
+				</p>
+				<button
+					v-if="activeMapId === 3"
+					class="btn"
+					:disabled="bricks < offers.fertilizer.bricks || rocks < offers.fertilizer.rocks"
+					@click="buyItem('fertilizer')"
+				>
+					Buy Fertilizer
 				</button>
 
 				<button class="btn close" @click="showExchange = false">Close</button>
@@ -236,12 +360,21 @@ import { useGameStore } from '../../store/game.store';
 import api from '../../services/api';
 import map1 from '../../assets/maps/map1.json';
 import map2 from '../../assets/maps/map2.json';
+import map3 from '../../assets/maps/map3.json';
+import map4 from '../../assets/maps/map4.json';
+import map5 from '../../assets/maps/map5.json';
 import mapImage1 from '../../assets/maps/maplevel1.png';
 import mapImage2 from '../../assets/maps/maplevel2.png';
+import mapImage3Asset from '../../assets/maps/maplevel2nofactory.png';
+import mapImage4 from '../../assets/maps/maplevel4.png';
+import mapImage5 from '../../assets/maps/maplevel5.png';
 import npcImg from '../../assets/sprites/npc_exchanger.png';
 import gateImg from '../../assets/sprites/gate.png';
 import shovelImg from '../../assets/sprites/item_shovel.png';
 import wateringCanImg from '../../assets/sprites/item_wateringcan.png';
+import fertilizerImg from '../../assets/sprites/fertilizer.png';
+import flowersImg from '../../assets/sprites/flowers.png';
+import fenceImg from '../../assets/sprites/fence.png';
 import Tile from './Tile.vue';
 import PlayerSprite from './PlayerSprite.vue';
 
@@ -249,8 +382,22 @@ const auth = useAuthStore();
 const gameStore = useGameStore();
 
 const activeMapId = ref(1);
-const mapObj = computed(() => (activeMapId.value === 1 ? map1 : map2));
-const mapImage = computed(() => (activeMapId.value === 1 ? mapImage1 : mapImage2));
+// Map 3 background
+const mapImage3 = mapImage3Asset;
+const mapObj = computed(() => (
+	activeMapId.value === 1 ? map1 :
+	activeMapId.value === 2 ? map2 :
+	activeMapId.value === 3 ? map3 :
+	activeMapId.value === 4 ? map4 :
+	map5
+));
+const mapImage = computed(() => (
+	activeMapId.value === 1 ? mapImage1 :
+	activeMapId.value === 2 ? mapImage2 :
+	activeMapId.value === 3 ? mapImage3 :
+	activeMapId.value === 4 ? mapImage4 :
+	mapImage5
+));
 
 const wrapperStyle = computed(() => ({
 	width: mapObj.value.width * mapObj.value.tileSize + 'px',
@@ -466,6 +613,18 @@ const npcX = 25;
 const npcY = 13;
 const gateX = 19;
 const gateY = 0;
+// Second gate in Map 2, using same coords for simplicity
+const gate2X = 19;
+const gate2Y = 0;
+// Portal gate in Map 3 -> Map 4
+const gate3X = 19;
+const gate3Y = 0;
+// Portal gate in Map 4 -> Map 5
+const gate4X = 14;
+const gate4Y = 17;
+// Portal on Map 5 (visual only for now)
+const gate5X = 19;
+const gate5Y = 0;
 
 const playerX = ref(1);
 const playerY = ref(1);
@@ -473,9 +632,57 @@ const playerDirection = ref('down'); // 'down' | 'up' | 'left' | 'right'
 const isWalking = ref(false);
 const bricks = ref(0);
 const rocks = ref(0);
+const wood = ref(0);
 const wateringCans = ref(0);
 const shovels = ref(0);
+const fertilizers = ref(0);
 const destroyedTiles = ref([]);
+// Map 4: local tree click accumulation (5 clicks = 1 wood)
+const map4TreeLocalClicks = ref(0);
+// Shared flower progress for Map 3
+const flowerProgressByTile = ref({}); // { 'x,y': current }
+const floweredSet = ref(new Set());
+const hoverTile = ref(null); // { x, y }
+const flowerParticles = ref([]); // { id, x, y, ox, oy }
+const floweredTileKeys = computed(() => {
+	const entries = Object.entries(flowerProgressByTile.value || {});
+	return entries.filter(([, v]) => (typeof v === 'number' ? v : 0) >= 50).map(([k]) => k);
+});
+const flowersPlanted = computed(() => floweredTileKeys.value.length);
+const flowersTotal = computed(() => factoryCoords.length);
+
+// Tiles that still need watering (Map 3 only)
+const waterableTileKeys = computed(() => {
+	if (activeMapId.value !== 3) return [];
+	const required = 50;
+	return factoryCoords
+		.map(([x, y]) => `${x},${y}`)
+		.filter((k) => {
+			if (floweredSet.value.has(k)) return false;
+			const cur = (flowerProgressByTile.value[k] || 0);
+			return cur < required;
+		});
+});
+
+// Map 4: wood resource tiles (blocked) and fence target tiles
+const map4WoodCoords = [
+	[4,13],[5,17],[3,16],[1,13],[10,6],[10,5],[15,7],[15,6],[15,5],[17,8],[21,3],[23,1],[29,3]
+];
+const map4FenceCoords = [
+	[29,4],[28,4],[13,12],[12,12],[11,12],[10,12],[14,12],[8,6],[7,6],[6,6],[5,6]
+];
+const map4WoodSet = new Set(map4WoodCoords.map(([x,y]) => `${x},${y}`));
+const map4FenceTargetsSet = new Set(map4FenceCoords.map(([x,y]) => `${x},${y}`));
+const fenceBuiltSet = ref(new Set());
+const fencesBuiltCount = computed(() => fenceBuiltSet.value.size);
+const fencesTotal = computed(() => map4FenceTargetsSet.size);
+const map4FenceTargetKeys = computed(() => {
+	if (activeMapId.value !== 4) return [];
+	return Array.from(map4FenceTargetsSet).filter(k => !fenceBuiltSet.value.has(k));
+});
+
+// Map 4: explicit walkable exceptions within the tree belt
+const map4UnblockedExceptions = new Set(['19,1','19,0','20,1','20,2']);
 
 const clickMultiplier = computed(() => (shovels.value > 0 ? 2 : 1));
 
@@ -483,6 +690,7 @@ const showExchange = ref(false);
 const offers = ref({
 	watering: { bricks: 0, rocks: 0 },
 	shovel: { bricks: 0, rocks: 0 },
+	fertilizer: { bricks: 0, rocks: 0 },
 });
 
 const factoryLocalClicks = ref(0);
@@ -506,6 +714,34 @@ const otherPlayers = computed(() => {
 
 // Players currently showing bubbles
 const bubblePlayers = computed(() => otherPlayers.value.filter(p => !!chatBubbles.value[p.username]));
+function isFactoryTile(x, y) {
+	return factorySet.has(`${x},${y}`);
+}
+
+function handleTileHover(tile) {
+	if (activeMapId.value === 3 && isFactoryTile(tile.x, tile.y)) {
+		hoverTile.value = { x: tile.x, y: tile.y };
+	} else {
+		hoverTile.value = null;
+	}
+}
+function clearTileHover() {
+	hoverTile.value = null;
+}
+
+function spawnFlowerParticles(x, y) {
+	const count = 8;
+	const baseId = Date.now();
+	for (let i = 0; i < count; i++) {
+		const ox = (Math.random() - 0.5) * 24; // -12..12
+		const oy = (Math.random() - 0.5) * 24; // -12..12
+		const id = `${baseId}-${i}`;
+		flowerParticles.value.push({ id, x, y, ox, oy });
+		setTimeout(() => {
+			flowerParticles.value = flowerParticles.value.filter(p => p.id !== id);
+		}, 700);
+	}
+}
 
 // Player card modal state
 const showPlayerCard = ref(false);
@@ -590,6 +826,7 @@ function registerRoomHandlers() {
 				rocks.value = inv.rocks;
 				wateringCans.value = inv.tools?.watering_can || 0;
 				shovels.value = inv.tools?.shovel || 0;
+				fertilizers.value = inv.tools?.fertilizer || 0;
 			} catch (err) {}
 		}
 		waitingPartnerConfirm.value = false;
@@ -611,7 +848,45 @@ function registerRoomHandlers() {
 	});
 	gameStore.room.onMessage('mapUnlocked', (data) => {
 		const nextId = data?.mapId;
-		if (nextId) showBanner(`Map ${nextId} unlocked!`, 'success');
+		if (!nextId) return;
+		showBanner(`Map ${nextId} unlocked!`, 'success');
+		if (nextId === 3) {
+			tryTravelToMap3();
+		} else if (nextId === 4) {
+			tryTravelToMap4();
+		} else if (nextId === 5) {
+			tryTravelToMap5();
+		}
+	});
+	// Flower progress for Map 3
+	gameStore.room.onMessage('flowerProgress', (data) => {
+		if (!data || data.mapId !== 3) return;
+		const key = `${data.x},${data.y}`;
+		const cur = typeof data.current === 'number' ? data.current : 0;
+		flowerProgressByTile.value = { ...flowerProgressByTile.value, [key]: cur };
+		if (cur >= (data.required || 50)) {
+			floweredSet.value.add(key);
+			spawnFlowerParticles(data.x, data.y);
+		}
+	});
+	gameStore.room.onMessage('tileFlowered', (data) => {
+		if (!data || data.mapId !== 3) return;
+		const key = `${data.x},${data.y}`;
+		floweredSet.value.add(key);
+		spawnFlowerParticles(data.x, data.y);
+	});
+	// Fence building progress for Map 4
+	gameStore.room.onMessage('fenceBuilt', (data) => {
+		if (!data || data.mapId !== 4) return;
+		const key = `${data.x},${data.y}`;
+		fenceBuiltSet.value.add(key);
+	});
+	gameStore.room.onMessage('fenceCount', (data) => {
+		if (!data || data.mapId !== 4) return;
+		// When counts change, keep watcher logic for auto-travel
+		// fencesBuiltCount and fencesTotal are computed from current sets; ensure target total reflects server
+		// Adjust total by reinitializing map4FenceTargetsSet if server provides `total`
+		// Here we trust initial targets; `built` updates come via fenceBuilt events.
 	});
 	roomHandlersBound.value = true;
 }
@@ -638,6 +913,17 @@ watch(() => tradePartner.value, () => {
 });
 watch(() => showTradeForm.value, (v) => {
 	if (v) loadPartnerInventory();
+});
+
+// Auto-travel to Map 5 when all fences are built on Map 4
+watch([
+	() => fencesBuiltCount.value,
+	() => fencesTotal.value,
+	() => activeMapId.value
+], ([built, total, id]) => {
+	if (id === 4 && total > 0 && built >= total) {
+		tryTravelToMap5();
+	}
 });
 
 function respondTrade(accepted) {
@@ -714,6 +1000,7 @@ function sendChat() {
 		console.error('Failed to send chat', err);
 	}
 }
+
 function executeExchange() {
 	const aId = auth.user?.id; // proposer (me)
 	const bClient = (gameStore.clients || []).find(c => c.username === tradePartner.value);
@@ -754,7 +1041,27 @@ function showBanner(msg, type = '') {
 }
 function isBlocked(x, y) {
 	const key = `${x},${y}`;
-	return unwalkableSet.has(key) && !isDestroyed(x, y);
+	// On Map 4, remove all ruins/factory blocking; keep only perimeter trees
+	if (activeMapId.value === 4) {
+		const w = mapObj.value.width;
+		// Always allow stepping on explicit exception tiles
+		if (map4UnblockedExceptions.has(key)) return false;
+		// Block top belt and side belts (trees): y <= 1, x <= 1, x >= w-2
+		if (y <= 1 || x <= 1 || x >= (w - 2)) {
+			// Allow stepping on the portal tile and fence target tiles
+			if (x === gate4X && y === gate4Y) return false;
+			if (map4FenceTargetsSet.has(key)) return false;
+			return true;
+		}
+		// Block wood resource tiles and built fence tiles
+		if (map4WoodSet.has(key)) return true;
+		if (fenceBuiltSet.value.has(key)) return true;
+		return false;
+	}
+	if (unwalkableSet.has(key) && !isDestroyed(x, y)) return true;
+	// Flowered tiles are blocked
+	if (floweredSet.value.has(key)) return true;
+	return false;
 }
 
 async function sendProgress({ deltaBricks = 0, deltaRocks = 0, deltaWorldScore = 0 }) {
@@ -790,6 +1097,23 @@ function doFactoryClick(x, y) {
 	}
 }
 
+function doWaterTile(x, y) {
+	const key = `${x},${y}`;
+	if (!factorySet.has(key)) return;
+	if (wateringCans.value <= 0) {
+		showBanner('You need a watering can to water.', 'warning');
+		return;
+	}
+	if (gameStore.room) {
+		try {
+			const inc = fertilizers.value > 0 ? 3 : 1;
+			gameStore.room.send('waterTile', { mapId: 3, x, y, inc });
+		} catch (err) {
+			console.error('Failed to send waterTile', err);
+		}
+	}
+}
+
 function handleTileClick(tile) {
 	const key = `${tile.x},${tile.y}`;
 	// NPC interaction
@@ -804,13 +1128,67 @@ function handleTileClick(tile) {
 				bricks: Math.floor(Math.random() * 6) + 5, // 5-10 bricks
 				rocks: Math.floor(Math.random() * 5) + 3,  // 3-7 rocks
 			},
+			fertilizer: activeMapId.value === 3 ? {
+				bricks: Math.floor(Math.random() * 11) + 20, // 20-30 bricks
+				rocks: Math.floor(Math.random() * 11) + 15,  // 15-25 rocks
+			} : { bricks: 0, rocks: 0 },
 		};
 		showExchange.value = true;
 		return;
 	}
-	if (factorySet.has(key)) {
-		doFactoryClick(tile.x, tile.y);
+	if (activeMapId.value !== 4 && factorySet.has(key)) {
+		if (activeMapId.value === 3) {
+			doWaterTile(tile.x, tile.y);
+		} else {
+			doFactoryClick(tile.x, tile.y);
+		}
 		return;
+	}
+	// Map 4 interactions: gather wood or build fences
+	if (activeMapId.value === 4) {
+		// Perimeter trees: 5 clicks yield 1 wood
+		const w = mapObj.value.width;
+		const isTree = (tile.y <= 1 || tile.x <= 1 || tile.x >= (w - 2));
+		if (isTree) {
+			map4TreeLocalClicks.value += 1;
+			if (map4TreeLocalClicks.value % 5 === 0) {
+				wood.value += 1;
+				showBanner('Gained 1 wood from trees', 'success');
+			} else {
+				const rem = 5 - (map4TreeLocalClicks.value % 5);
+				showBanner(`${rem} more clicks to gain 1 wood`, 'warning');
+			}
+			return;
+		}
+		// Gather wood from blocked resource tiles
+		if (map4WoodSet.has(key)) {
+			wood.value += 1;
+			showBanner('Collected 1 wood', 'success');
+			return;
+		}
+		// Build fence if clicking a target tile and have enough wood
+		if (map4FenceTargetsSet.has(key)) {
+			if (fenceBuiltSet.value.has(key)) {
+				showBanner('Fence already built here.', 'warning');
+				return;
+			}
+			if ((wood.value || 0) >= 10) {
+				wood.value -= 10;
+				// Immediately mark fence built locally so counts update
+				fenceBuiltSet.value.add(key);
+				if (gameStore.room) {
+					try {
+						gameStore.room.send('buildFence', { x: tile.x, y: tile.y });
+						showBanner('Built a fence (-10 wood)', 'success');
+					} catch (err) {
+						console.error('Failed to send buildFence', err);
+					}
+				}
+			} else {
+				showBanner('Need 10 wood to build a fence.', 'warning');
+			}
+			return;
+		}
 	}
 	if (debrisSet.has(key) && !isDestroyed(tile.x, tile.y)) {
 		destroyedTiles.value.push({ x: tile.x, y: tile.y });
@@ -844,8 +1222,25 @@ function movePlayer(deltaX, deltaY) {
 	playerY.value = targetY;
 
 	// Travel if standing on gate tile (requires shared threshold reached)
-	if (playerX.value === gateX && playerY.value === gateY) {
+	if (activeMapId.value === 1 && playerX.value === gateX && playerY.value === gateY) {
 		tryTravelToMap2();
+	}
+	if (activeMapId.value === 2 && playerX.value === gate2X && playerY.value === gate2Y) {
+		tryTravelToMap3();
+	}
+	if (activeMapId.value === 3 && playerX.value === gate3X && playerY.value === gate3Y) {
+		if (flowersPlanted.value >= flowersTotal.value) {
+			tryTravelToMap4();
+		} else {
+			showBanner(`Portal locked: ${flowersPlanted.value}/${flowersTotal.value} flowers`, 'warning');
+		}
+	}
+	if (activeMapId.value === 4 && playerX.value === gate4X && playerY.value === gate4Y) {
+		if (fencesTotal.value === 0 || (fencesBuiltCount.value >= fencesTotal.value && fencesTotal.value > 0)) {
+			tryTravelToMap5();
+		} else {
+			showBanner(`Portal locked: ${fencesBuiltCount.value}/${fencesTotal.value} fences`, 'warning');
+		}
 	}
 	setTimeout(() => { isWalking.value = false; }, 200); // reset walk anim after 200ms
 
@@ -874,17 +1269,45 @@ function interact() {
 				bricks: Math.floor(Math.random() * 6) + 5,
 				rocks: Math.floor(Math.random() * 5) + 3,
 			},
+			fertilizer: activeMapId.value === 3 ? {
+				bricks: Math.floor(Math.random() * 11) + 20, // 20-30 bricks
+				rocks: Math.floor(Math.random() * 11) + 15,  // 15-25 rocks
+			} : { bricks: 0, rocks: 0 },
 		};
 		showExchange.value = true;
 		return;
 	}
-	if (factorySet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
-		doFactoryClick(playerX.value, playerY.value);
+	if (activeMapId.value !== 4 && factorySet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
+		if (activeMapId.value === 3) {
+			doWaterTile(playerX.value, playerY.value);
+		} else {
+			doFactoryClick(playerX.value, playerY.value);
+		}
 		return;
 	}
-	// Also allow interact on gate
-	if (playerX.value === gateX && playerY.value === gateY) {
+	// Also allow interact on gates
+	if (activeMapId.value === 1 && playerX.value === gateX && playerY.value === gateY) {
 		tryTravelToMap2();
+		return;
+	}
+	if (activeMapId.value === 2 && playerX.value === gate2X && playerY.value === gate2Y) {
+		tryTravelToMap3();
+		return;
+	}
+	if (activeMapId.value === 3 && playerX.value === gate3X && playerY.value === gate3Y) {
+		if (flowersPlanted.value >= flowersTotal.value) {
+			tryTravelToMap4();
+		} else {
+			showBanner(`Portal locked: ${flowersPlanted.value}/${flowersTotal.value} flowers`, 'warning');
+		}
+		return;
+	}
+	if (activeMapId.value === 4 && playerX.value === gate4X && playerY.value === gate4Y) {
+		if (fencesTotal.value === 0 || (fencesBuiltCount.value >= fencesTotal.value && fencesTotal.value > 0)) {
+			tryTravelToMap5();
+		} else {
+			showBanner(`Portal locked: ${fencesBuiltCount.value}/${fencesTotal.value} fences`, 'warning');
+		}
 		return;
 	}
 	if (debrisSet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
@@ -933,6 +1356,27 @@ function buyItem(type) {
 			console.error('Failed to buy shovel', err);
 		});
 	}
+	else if (type === 'fertilizer') {
+		const cost = offers.value.fertilizer;
+		const playerId = auth.user?.id;
+		if (!playerId) return;
+		api.post('/api/player/tools/buy', {
+			playerId,
+			type: 'fertilizer',
+			costBricks: cost.bricks,
+			costRocks: cost.rocks,
+		}).then((res) => {
+			const inv = res.data.inventory;
+			bricks.value = inv.bricks;
+			rocks.value = inv.rocks;
+			wateringCans.value = inv.tools?.watering_can || 0;
+			shovels.value = inv.tools?.shovel || 0;
+			fertilizers.value = inv.tools?.fertilizer || 0;
+			showExchange.value = false;
+		}).catch((err) => {
+			console.error('Failed to buy fertilizer', err);
+		});
+	}
 }
 
 function handleKeyDown(event) {
@@ -959,6 +1403,12 @@ onMounted(async () => {
 
 	window.addEventListener('keydown', handleKeyDown);
 
+	// Start player in the middle of the current map
+	const startCx = Math.floor(mapObj.value.width / 2);
+	const startCy = Math.floor(mapObj.value.height / 2);
+	playerX.value = startCx;
+	playerY.value = startCy;
+
 	// Load inventory + tools from server
 	const playerId = auth.user?.id;
 	if (playerId) {
@@ -969,6 +1419,7 @@ onMounted(async () => {
 			rocks.value = inv.rocks;
 			wateringCans.value = inv.tools?.watering_can || 0;
 			shovels.value = inv.tools?.shovel || 0;
+			fertilizers.value = inv.tools?.fertilizer || 0;
 		} catch (err) {
 			console.error('Failed to load inventory', err);
 		}
@@ -1000,11 +1451,14 @@ async function tryTravelToMap2() {
 	const playerId = auth.user?.id;
 	if (!playerId) return;
 	try {
-		// Move player to map 2, reset position to (1,1)
-		await api.post('/api/player/travel', { playerId, mapId: 2, x: 1, y: 1 });
+		// Move player to map 2, center position
+		const target = map2;
+		const cx = Math.floor(target.width / 2);
+		const cy = Math.floor(target.height / 2);
+		await api.post('/api/player/travel', { playerId, mapId: 2, x: cx, y: cy });
 		// Update local position immediately
-		playerX.value = 1;
-		playerY.value = 1;
+		playerX.value = cx;
+		playerY.value = cy;
 		// Notify room so others see new position (server still uses single room model)
 		if (gameStore.room) {
 			try {
@@ -1015,6 +1469,77 @@ async function tryTravelToMap2() {
 		showBanner('Traveled to Map 2!', 'success');
 	} catch (err) {
 		console.error('Failed to travel to map 2', err);
+	}
+}
+
+async function tryTravelToMap3() {
+	// Require shared progress threshold for Map 3
+	if (currentFactoryProgress.value.current < currentFactoryProgress.value.required) {
+		showBanner(`Gate locked: ${currentFactoryProgress.value.current}/${currentFactoryProgress.value.required} clicks`, 'warning');
+		return;
+	}
+	const playerId = auth.user?.id;
+	if (!playerId) return;
+	try {
+		// Move player to map 3, center position
+		const target = map3;
+		const cx = Math.floor(target.width / 2);
+		const cy = Math.floor(target.height / 2);
+		await api.post('/api/player/travel', { playerId, mapId: 3, x: cx, y: cy });
+		playerX.value = cx;
+		playerY.value = cy;
+		if (gameStore.room) {
+			try {
+				gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
+			} catch (err) {}
+		}
+		activeMapId.value = 3;
+		showBanner('Traveled to Map 3!', 'success');
+	} catch (err) {
+		console.error('Failed to travel to map 3', err);
+	}
+}
+
+async function tryTravelToMap4() {
+	const playerId = auth.user?.id;
+	if (!playerId) return;
+	try {
+		const target = map4;
+		const cx = Math.floor(target.width / 2);
+		const cy = Math.floor(target.height / 2);
+		await api.post('/api/player/travel', { playerId, mapId: 4, x: cx, y: cy });
+		playerX.value = cx;
+		playerY.value = cy;
+		if (gameStore.room) {
+			try {
+				gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
+			} catch (err) {}
+		}
+		activeMapId.value = 4;
+		showBanner('Traveled to Map 4!', 'success');
+	async function tryTravelToMap5() {
+		const playerId = auth.user?.id;
+		if (!playerId) return;
+		try {
+			const target = map5;
+			const cx = Math.floor(target.width / 2);
+			const cy = Math.floor(target.height / 2);
+			await api.post('/api/player/travel', { playerId, mapId: 5, x: cx, y: cy });
+			playerX.value = cx;
+			playerY.value = cy;
+			if (gameStore.room) {
+				try {
+					gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value });
+				} catch (err) {}
+			}
+			activeMapId.value = 5;
+			showBanner('Traveled to Map 5!', 'success');
+		} catch (err) {
+			console.error('Failed to travel to map 5', err);
+		}
+	}
+	} catch (err) {
+		console.error('Failed to travel to map 4', err);
 	}
 }
 </script>
@@ -1059,8 +1584,8 @@ async function tryTravelToMap2() {
 	position: absolute;
 	top: 0;
 	left: 0;
-	width: 32px;
-	height: 32px;
+	width: 48px;
+	height: 48px;
 	image-rendering: pixelated;
 	z-index: 9;
 	pointer-events: none;
@@ -1072,6 +1597,17 @@ async function tryTravelToMap2() {
 	left: 0;
 	width: 48px;
 	height: 48px;
+	image-rendering: pixelated;
+	z-index: 9;
+	pointer-events: none;
+}
+
+.portal-sprite {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 64px;
+	height: 64px;
 	image-rendering: pixelated;
 	z-index: 9;
 	pointer-events: none;
@@ -1146,6 +1682,70 @@ async function tryTravelToMap2() {
 	font-size: 10px;
 	border-radius: 4px;
 	transform-origin: bottom center;
+}
+
+.tile-progress {
+	position: absolute;
+	z-index: 12;
+	padding: 2px 4px;
+	background: rgba(0, 0, 0, 0.75);
+	color: #fff;
+	font-size: 10px;
+	border-radius: 4px;
+}
+
+.flower-particle {
+	position: absolute;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #ff69b4; /* pink */
+	opacity: 0.9;
+	animation: popFade 700ms ease-out forwards;
+}
+
+@keyframes popFade {
+	0% { opacity: 0.9; transform: scale(1); }
+	100% { opacity: 0; transform: scale(1.8); }
+}
+
+/* Shimmering highlight for waterable tiles on Map 3 */
+.waterable-shine {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border-radius: 4px;
+	background: rgba(0, 200, 255, 0.06);
+	box-shadow: 0 0 4px 1px rgba(0, 200, 255, 0.35);
+	animation: shinePulse 1400ms ease-in-out infinite;
+	image-rendering: pixelated;
+	z-index: 8;
+	pointer-events: none;
+}
+/* Subtle highlight for fence targets on Map 4 */
+.fence-target-shine {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border-radius: 4px;
+	background: rgba(120, 180, 120, 0.06);
+	box-shadow: 0 0 3px 1px rgba(120, 180, 120, 0.30);
+	animation: fencePulse 1600ms ease-in-out infinite;
+	image-rendering: pixelated;
+	z-index: 8;
+	pointer-events: none;
+}
+
+@keyframes fencePulse {
+	0% { box-shadow: 0 0 2px 1px rgba(120, 180, 120, 0.25); opacity: 0.5; }
+	50% { box-shadow: 0 0 6px 3px rgba(120, 190, 120, 0.55); opacity: 0.8; }
+	100% { box-shadow: 0 0 2px 1px rgba(120, 180, 120, 0.25); opacity: 0.5; }
+}
+
+@keyframes shinePulse {
+	0% { box-shadow: 0 0 3px 1px rgba(0, 200, 255, 0.30); opacity: 0.55; }
+	50% { box-shadow: 0 0 8px 3px rgba(0, 230, 255, 0.55); opacity: 0.8; }
+	100% { box-shadow: 0 0 3px 1px rgba(0, 200, 255, 0.30); opacity: 0.55; }
 }
 
 .inventory {

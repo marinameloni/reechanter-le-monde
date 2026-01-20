@@ -117,6 +117,82 @@ export class GameRoom extends Room {
       }
     });
 
+    // Shared watering per tile on Map 3 (former factory tiles)
+    this.onMessage("waterTile", async (client, data) => {
+      const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
+      const mapId = (data && typeof data.mapId === 'number') ? data.mapId : 3;
+      const x = (data && typeof data.x === 'number') ? data.x : null;
+      const y = (data && typeof data.y === 'number') ? data.y : null;
+      if (mapId !== 3 || x == null || y == null) return;
+      try {
+        const db = await openDB();
+        await db.exec('BEGIN TRANSACTION;');
+        const row = await db.get('SELECT water_current, water_required FROM flower_progress WHERE id_map = ? AND tile_x = ? AND tile_y = ?;', [mapId, x, y]);
+        if (!row) {
+          // initialize if not existing
+          await db.run('INSERT INTO flower_progress (id_map, tile_x, tile_y, water_current, water_required) VALUES (?, ?, ?, 0, 50);', [mapId, x, y]);
+        }
+        await db.run(
+          `UPDATE flower_progress
+           SET water_current = MIN(water_required, water_current + ?), updated_at = CURRENT_TIMESTAMP
+           WHERE id_map = ? AND tile_x = ? AND tile_y = ?;`,
+          [inc, mapId, x, y]
+        );
+        const updated = await db.get('SELECT water_current, water_required FROM flower_progress WHERE id_map = ? AND tile_x = ? AND tile_y = ?;', [mapId, x, y]);
+        await db.exec('COMMIT;');
+
+        // Broadcast updated tile progress to all
+        this.broadcast('flowerProgress', { mapId, x, y, current: updated.water_current || 0, required: updated.water_required || 50 });
+        // If tile completed, broadcast tileFlowered
+        if ((updated.water_current || 0) >= (updated.water_required || 50)) {
+          this.broadcast('tileFlowered', { mapId, x, y });
+          // Check if all tiles on map 3 completed
+          const remaining = await db.get('SELECT COUNT(*) as c FROM flower_progress WHERE id_map = 3 AND water_current < water_required;');
+          if ((remaining?.c || 0) === 0) {
+            this.broadcast('mapUnlocked', { mapId: 4 });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to update flower progress', err);
+      }
+    });
+
+    // Shared fence building on Map 4
+    this.onMessage("buildFence", async (client, data) => {
+      const x = (data && typeof data.x === 'number') ? data.x : null;
+      const y = (data && typeof data.y === 'number') ? data.y : null;
+      const mapId = 4;
+      if (x == null || y == null) return;
+      try {
+        const db = await openDB();
+        await db.exec('BEGIN TRANSACTION;');
+        const row = await db.get('SELECT built FROM fence_progress WHERE id_map = ? AND tile_x = ? AND tile_y = ?;', [mapId, x, y]);
+        if (!row) {
+          // initialize if not existing
+          await db.run('INSERT INTO fence_progress (id_map, tile_x, tile_y, built) VALUES (?, ?, ?, 0);', [mapId, x, y]);
+        }
+        // set as built
+        await db.run(
+          `UPDATE fence_progress
+           SET built = 1, updated_at = CURRENT_TIMESTAMP
+           WHERE id_map = ? AND tile_x = ? AND tile_y = ?;`,
+          [mapId, x, y]
+        );
+        const countRow = await db.get('SELECT SUM(built) as built_count, COUNT(*) as total FROM fence_progress WHERE id_map = ?;', [mapId]);
+        await db.exec('COMMIT;');
+
+        // Broadcast built fence and counts
+        this.broadcast('fenceBuilt', { mapId, x, y });
+        this.broadcast('fenceCount', { mapId, built: countRow?.built_count || 0, total: countRow?.total || 0 });
+        // Unlock map 5 when 11 fences (all) built
+        if ((countRow?.built_count || 0) >= (countRow?.total || 0) && (countRow?.total || 0) > 0) {
+          this.broadcast('mapUnlocked', { mapId: 5 });
+        }
+      } catch (err) {
+        console.error('Failed to build fence', err);
+      }
+    });
+
     // Partner sends counter-offer back to proposer
     this.onMessage("tradeCounterOffer", (client, data) => {
       const from = this.state.clients.find(c => c.sessionId === client.sessionId);
@@ -219,6 +295,25 @@ export class GameRoom extends Room {
       for (const row of rows || []) {
         client.send('factoryProgress', { mapId: row.id_map, clicksCurrent: row.clicks_current || 0, clicksRequired: row.clicks_required || 0 });
       }
+      // Also send current flower progress for map 3
+      const flowers = await db.all('SELECT id_map, tile_x, tile_y, water_current, water_required FROM flower_progress WHERE id_map = 3;');
+      for (const f of flowers || []) {
+        client.send('flowerProgress', { mapId: f.id_map, x: f.tile_x, y: f.tile_y, current: f.water_current || 0, required: f.water_required || 50 });
+        if ((f.water_current || 0) >= (f.water_required || 50)) {
+          client.send('tileFlowered', { mapId: f.id_map, x: f.tile_x, y: f.tile_y });
+        }
+      }
+      // Send current fence progress for map 4
+      const fences = await db.all('SELECT id_map, tile_x, tile_y, built FROM fence_progress WHERE id_map = 4;');
+      let builtCount = 0, totalCount = 0;
+      for (const fc of fences || []) {
+        totalCount++;
+        if ((fc.built || 0) > 0) {
+          builtCount++;
+          client.send('fenceBuilt', { mapId: fc.id_map, x: fc.tile_x, y: fc.tile_y });
+        }
+      }
+      client.send('fenceCount', { mapId: 4, built: builtCount, total: totalCount });
     } catch (err) {
       console.error('Failed to load factory progress on join', err);
     }
