@@ -81,12 +81,40 @@ export class GameRoom extends Room {
     });
 
     // Chat: broadcast bubbly messages to all clients
-    this.onMessage("chatMessage", (client, data) => {
+    this.onMessage("chatMessage", async (client, data) => {
       const from = this.state.clients.find(c => c.sessionId === client.sessionId);
       const text = (data && typeof data.text === 'string') ? data.text.trim() : '';
       if (!from || !text) return;
+      // Persist chat message for leaderboard (most talkative)
+      try {
+        const db = await openDB();
+        await db.run('INSERT INTO chat_message (id_player, message) VALUES (?, ?);', [from.id_player, text]);
+      } catch (err) {
+        console.warn('Failed to persist chat message', err?.message || err);
+      }
       // Broadcast to everyone (including sender) to render bubbles
       this.broadcast("chatMessage", { fromUsername: from.username, text });
+    });
+
+    // Admin commands: kick a user in current room
+    this.onMessage('adminKickUser', async (client, data) => {
+      const ok = await this.isAdminClient(client.sessionId);
+      if (!ok) return;
+      const targetUsername = data?.username;
+      if (!targetUsername) return;
+      const targetClient = this.clientByUsername.get(targetUsername);
+      if (targetClient) {
+        try { targetClient.send('kicked', { reason: 'admin_kick' }); } catch {}
+        try { targetClient.leave(0); } catch {}
+      }
+    });
+    // Admin announce unlock for a map
+    this.onMessage('adminAnnounceUnlock', async (client, data) => {
+      const ok = await this.isAdminClient(client.sessionId);
+      if (!ok) return;
+      const mapId = Number(data?.mapId);
+      if (!mapId) return;
+      this.broadcast('mapUnlocked', { mapId });
     });
 
     // Shared factory clicks per map
@@ -243,6 +271,18 @@ export class GameRoom extends Room {
         // Update contributing player's inventory
         try { client.send('inventoryUpdate', { bricks: newInv?.bricks || 0, rocks: newInv?.rocks || 0 }); } catch {}
 
+        // Track constructive contribution for leaderboard
+        try {
+          const statsExists = await openDB().then(d => d.get('SELECT 1 FROM player_stats WHERE id_player = ?;', [idPlayer]));
+          const db2 = await openDB();
+          await db2.exec('BEGIN TRANSACTION;');
+          if (!statsExists) {
+            await db2.run('INSERT INTO player_stats (id_player, constructive, harvest) VALUES (?, 0, 0);', [idPlayer]);
+          }
+          await db2.run('UPDATE player_stats SET constructive = constructive + 1 WHERE id_player = ?;', [idPlayer]);
+          await db2.exec('COMMIT;');
+        } catch {}
+
         // Broadcast progress to all
         this.broadcast('houseProgress', { mapId: 5, x, y, current: updated.progress || 0, required: updated.required || 50 });
         if ((updated.progress || 0) >= (updated.required || 50)) {
@@ -252,6 +292,30 @@ export class GameRoom extends Room {
         try {
           const allRows = await db.all('SELECT id_map, tile_x, tile_y, progress, required FROM house_progress WHERE id_map = 5;');
           this.broadcast('houseAllProgress', { mapId: 5, rows: (allRows || []).map(r => ({ x: r.tile_x, y: r.tile_y, current: r.progress || 0, required: r.required || 50 })) });
+          // If all houses completed, announce gameFinished with leaderboard
+          const allDone = (allRows || []).length > 0 && (allRows || []).every(r => (r.progress || 0) >= (r.required || 50));
+          if (allDone) {
+            const db3 = await openDB();
+            const mostConstructive = await db3.get(`SELECT p.username as username FROM player_stats s JOIN player p ON p.id_player = s.id_player ORDER BY s.constructive DESC, p.id_player ASC LIMIT 1;`);
+            const mostHarvest = await db3.get(`SELECT p.username as username FROM player_stats s JOIN player p ON p.id_player = s.id_player ORDER BY s.harvest DESC, p.id_player ASC LIMIT 1;`);
+            const mostTalkative = await db3.get(`SELECT p.username as username, COUNT(*) as cnt FROM chat_message c JOIN player p ON p.id_player = c.id_player GROUP BY c.id_player ORDER BY cnt DESC, p.id_player ASC LIMIT 1;`);
+            const didNothing = await db3.get(`
+              SELECT p.username as username FROM player p
+              LEFT JOIN player_stats s ON s.id_player = p.id_player
+              LEFT JOIN (SELECT id_player, COUNT(*) as cnt FROM chat_message GROUP BY id_player) cm ON cm.id_player = p.id_player
+              WHERE COALESCE(s.constructive, 0) = 0 AND COALESCE(s.harvest, 0) = 0 AND COALESCE(cm.cnt, 0) = 0
+              ORDER BY p.id_player ASC LIMIT 1;
+            `);
+            this.broadcast('gameFinished', {
+              title: 'Monde Réanchanté! Bravo ! :)',
+              leaderboard: {
+                mostConstructive: mostConstructive?.username || null,
+                mostHarvest: mostHarvest?.username || null,
+                mostTalkative: mostTalkative?.username || null,
+                didNothing: didNothing?.username || null,
+              }
+            });
+          }
         } catch {}
       } catch (err) {
         console.error('Failed to build house', err);
@@ -325,10 +389,16 @@ export class GameRoom extends Room {
     try {
       const db = await openDB();
       const row = await db.get(
-        `SELECT id_player, id_map, x, y, color FROM player WHERE username = ?`,
+        `SELECT id_player, id_map, x, y, color, is_blocked FROM player WHERE username = ?`,
         [username]
       );
       playerRow = row;
+      // If blocked, refuse join immediately
+      if (row && Number(row.is_blocked) === 1) {
+        try { client.send('blocked', { reason: 'user_blocked' }); } catch {}
+        try { client.leave(0); } catch {}
+        return;
+      }
       if (row) {
         if (typeof row.x === "number") startX = row.x;
         if (typeof row.y === "number") startY = row.y;
@@ -420,6 +490,19 @@ export class GameRoom extends Room {
       }
     } catch (err) {
       console.error('Failed to load factory progress on join', err);
+    }
+  }
+
+  // Admin-only helpers
+  async isAdminClient(sessionId) {
+    try {
+      const player = this.state.clients.find(c => c.sessionId === sessionId);
+      if (!player || !player.id_player) return false;
+      const db = await openDB();
+      const row = await db.get('SELECT role FROM player WHERE id_player = ?;', [player.id_player]);
+      return !!row && row.role === 'admin';
+    } catch {
+      return false;
     }
   }
 

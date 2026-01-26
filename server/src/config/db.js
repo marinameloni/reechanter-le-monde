@@ -58,6 +58,12 @@ export async function openDB() {
     await db.exec("ALTER TABLE player ADD COLUMN role TEXT DEFAULT 'user';");
   }
 
+  // Ensure a blocked flag exists for moderation
+  const hasBlockedColumn = columns.some((c) => c.name === 'is_blocked');
+  if (!hasBlockedColumn) {
+    await db.exec("ALTER TABLE player ADD COLUMN is_blocked INTEGER DEFAULT 0;");
+  }
+
   // S'assure que la colonne "color" existe dans player
   const hasColorColumn = columns.some((c) => c.name === 'color');
   if (!hasColorColumn) {
@@ -156,6 +162,16 @@ export async function openDB() {
     }
   }
   await db.exec('COMMIT;');
+
+  // Ensure player_stats table exists for leaderboard
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS player_stats (
+      id_player INTEGER PRIMARY KEY,
+      constructive INTEGER DEFAULT 0,
+      harvest INTEGER DEFAULT 0,
+      FOREIGN KEY (id_player) REFERENCES player(id_player)
+    );
+  `);
 
   return db;
 }

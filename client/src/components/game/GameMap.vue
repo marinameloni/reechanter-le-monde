@@ -212,6 +212,16 @@
 				class="flower-particle"
 				:style="{ transform: `translate(${p.x * mapObj.tileSize + p.ox}px, ${p.y * mapObj.tileSize + p.oy}px)` }"
 			></div>
+			<!-- Endgame overlay -->
+			<div v-if="gameFinished" class="endgame-overlay">
+				<h2>Monde Réanchanté! Bravo ! :)</h2>
+				<ul class="leaderboard">
+					<li>Most constructive: {{ leaderboard.mostConstructive || '—' }}</li>
+					<li>Harvested the most: {{ leaderboard.mostHarvest || '—' }}</li>
+					<li>Most talkative: {{ leaderboard.mostTalkative || '—' }}</li>
+					<li>Did nothing: {{ leaderboard.didNothing || '—' }}</li>
+				</ul>
+			</div>
 		</div>
 		<div class="hud">
 			<p>Position: ({{ playerX }}, {{ playerY }})</p>
@@ -477,6 +487,10 @@ const housesProgressDisplay = computed(() => {
 		return `${s.key}: ${cur} / ${houseRequired}`;
 	}).join(' | ');
 });
+
+// Endgame state
+const gameFinished = ref(false);
+const leaderboard = ref({ mostConstructive: null, mostHarvest: null, mostTalkative: null, didNothing: null });
 
 const unwalkableCoords = [
 	[8, 0],
@@ -770,6 +784,7 @@ const otherPlayers = computed(() => {
 	return (gameStore.clients || []).filter(
 		(p) => p.username && p.username !== me
 	);
+
 });
 
 // Players currently showing bubbles
@@ -917,7 +932,9 @@ function registerRoomHandlers() {
 		const nextId = data?.mapId;
 		if (!nextId) return;
 		showBanner(`Map ${nextId} unlocked!`, 'success');
-		if (nextId === 3) {
+		if (nextId === 2) {
+			tryTravelToMap2();
+		} else if (nextId === 3) {
 			tryTravelToMap3();
 		} else if (nextId === 4) {
 			tryTravelToMap4();
@@ -961,6 +978,17 @@ function registerRoomHandlers() {
 		const key = `${data.x},${data.y}`;
 		const cur = typeof data.current === 'number' ? data.current : 0;
 		houseProgress.value = { ...houseProgress.value, [key]: cur };
+	});
+	gameStore.room.onMessage('gameFinished', (data) => {
+		gameFinished.value = true;
+		if (data && data.leaderboard) {
+			leaderboard.value = {
+				mostConstructive: data.leaderboard.mostConstructive || null,
+				mostHarvest: data.leaderboard.mostHarvest || null,
+				mostTalkative: data.leaderboard.mostTalkative || null,
+				didNothing: data.leaderboard.didNothing || null,
+			};
+		}
 	});
 	gameStore.room.onMessage('houseAllProgress', (data) => {
 		if (!data || data.mapId !== 5 || !Array.isArray(data.rows)) return;
@@ -1781,6 +1809,7 @@ async function tryTravelToMap5() {
 }
 
 .hud {
+
 	margin-top: 8px;
 	font-size: 0.9rem;
 	color: #555;

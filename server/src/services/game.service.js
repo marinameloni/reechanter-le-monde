@@ -30,6 +30,15 @@ export async function applyProgress({
 				 WHERE id_player = ?;`,
 				[deltaBricks, deltaRocks, playerId]
 			);
+
+			// Track harvest stats when rocks increased
+			if ((deltaRocks || 0) > 0) {
+				const exists = await db.get('SELECT 1 FROM player_stats WHERE id_player = ?;', [playerId]);
+				if (!exists) {
+					await db.run('INSERT INTO player_stats (id_player, constructive, harvest) VALUES (?, 0, 0);', [playerId]);
+				}
+				await db.run('UPDATE player_stats SET harvest = harvest + ? WHERE id_player = ?;', [deltaRocks, playerId]);
+			}
 		}
 
 		if (deltaWorldScore !== 0) {
