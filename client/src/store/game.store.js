@@ -20,9 +20,20 @@ export const useGameStore = defineStore('game', {
 			if (this.connected) return;
 
 			try {
-				   // Colyseus est servi via l'URL définie dans VITE_COLYSEUS_URL
-				   const colyseusUrl = import.meta.env.VITE_COLYSEUS_URL || 'ws://localhost:4000';
-				   const client = new Client(colyseusUrl);
+									 // Colyseus: VITE_COLYSEUS_URL prioritaire; sinon fallback basé sur l'origine
+									 const wsUrl = (() => {
+										 const envUrl = (import.meta.env && import.meta.env.VITE_COLYSEUS_URL) || '';
+										 if (envUrl && envUrl.trim()) return envUrl.trim();
+										 try {
+											 const { protocol, hostname, port } = window.location;
+											 const wsProto = protocol === 'https:' ? 'wss:' : 'ws:';
+											 if (port === '3000') return `${wsProto}//${hostname}:3001/colyseus`;
+											 return `${wsProto}//${hostname}/colyseus`;
+										 } catch {
+											 return 'ws://localhost:3001/colyseus';
+										 }
+									 })();
+									 const client = new Client(wsUrl);
 				const room = await client.joinOrCreate('game_room', { username, mapId });
 
 				this.room = room;
@@ -56,8 +67,19 @@ export const useGameStore = defineStore('game', {
 				this.connected = false;
 
 				// Reconnect to target map room using same server
-				   const colyseusUrl = import.meta.env.VITE_COLYSEUS_URL || 'ws://localhost:4000';
-				   const client = new Client(colyseusUrl);
+									 const wsUrl2 = (() => {
+										 const envUrl = (import.meta.env && import.meta.env.VITE_COLYSEUS_URL) || '';
+										 if (envUrl && envUrl.trim()) return envUrl.trim();
+										 try {
+											 const { protocol, hostname, port } = window.location;
+											 const wsProto = protocol === 'https:' ? 'wss:' : 'ws:';
+											 if (port === '3000') return `${wsProto}//${hostname}:3001/colyseus`;
+											 return `${wsProto}//${hostname}/colyseus`;
+										 } catch {
+											 return 'ws://localhost:3001/colyseus';
+										 }
+									 })();
+									 const client = new Client(wsUrl2);
 				const room = await client.joinOrCreate('game_room', { username, mapId });
 				this.room = room;
 				this.connected = true;
