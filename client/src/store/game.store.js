@@ -20,8 +20,9 @@ export const useGameStore = defineStore('game', {
 			if (this.connected) return;
 
 			try {
-				// Colyseus est servi via le même port HTTP que l'API (4000)
-				const client = new Client('ws://localhost:4000');
+				   // Colyseus est servi via l'URL définie dans VITE_COLYSEUS_URL
+				   const colyseusUrl = import.meta.env.VITE_COLYSEUS_URL || 'ws://localhost:4000';
+				   const client = new Client(colyseusUrl);
 				const room = await client.joinOrCreate('game_room', { username, mapId });
 
 				this.room = room;
@@ -55,7 +56,8 @@ export const useGameStore = defineStore('game', {
 				this.connected = false;
 
 				// Reconnect to target map room using same server
-				const client = new Client('ws://localhost:4000');
+				   const colyseusUrl = import.meta.env.VITE_COLYSEUS_URL || 'ws://localhost:4000';
+				   const client = new Client(colyseusUrl);
 				const room = await client.joinOrCreate('game_room', { username, mapId });
 				this.room = room;
 				this.connected = true;

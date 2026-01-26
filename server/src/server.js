@@ -37,6 +37,6 @@ gameServer
   .define('game_room', GameRoom)
   .filterBy(['mapId']);
 
-const PORT = 4000;
+const PORT = 3001;
 gameServer.listen(PORT);
 console.log(`HTTP + Colyseus listening on http://localhost:${PORT} (ws sur le même port)`);

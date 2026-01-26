@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 // Instance Axios centralisée pour tous les appels au backend
-// Backend Express tourne sur http://localhost:4000
+// Backend Express tourne sur l'URL définie dans VITE_API_URL
 const api = axios.create({
-	baseURL: 'http://localhost:4000',
+  baseURL: import.meta.env.VITE_API_URL,
 });
 
 // Injecte automatiquement le token (si présent) depuis localStorage
