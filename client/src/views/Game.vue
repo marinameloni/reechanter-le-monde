@@ -6,6 +6,7 @@
 				<span class="username">{{ auth.user.username }}</span>
 				<span class="role" v-if="auth.isAdmin">(admin)</span>
 				<div class="robot-preview" :style="{ backgroundColor: localColor }"></div>
+				<router-link v-if="auth.isAdmin" to="/admin" class="admin-link">Admin</router-link>
 			</div>
 		</header>
 
@@ -141,6 +142,15 @@ onMounted(async () => {
 	width: 24px;
 	height: 24px;
 	border: 1px solid #000;
+}
+
+.admin-link {
+	margin-left: 10px;
+	padding: 4px 8px;
+	border-radius: 6px;
+	background: #333;
+	color: #fff;
+	text-decoration: none;
 }
 
 .color-customization {

@@ -1,10 +1,11 @@
-// server/src/routes/auth.routes.js
 import { Router } from 'express';
-import { signup, login } from '../controllers/auth.controller.js';
+import { resetGame, grantAdminRocks } from '../controllers/admin.controller.js';
+import { requireAdmin } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-router.post('/signup', signup);
-router.post('/login', login);
+// Admin-only endpoint to reset the game state
+router.post('/reset', requireAdmin, resetGame);
+router.post('/grant-rocks', requireAdmin, grantAdminRocks);
 
-export default router;  // ✅ important pour l'import default
+export default router;

@@ -248,6 +248,11 @@ export class GameRoom extends Room {
         if ((updated.progress || 0) >= (updated.required || 50)) {
           this.broadcast('houseBuilt', { mapId: 5, x, y });
         }
+        // Broadcast full house progress snapshot to keep all clients in sync
+        try {
+          const allRows = await db.all('SELECT id_map, tile_x, tile_y, progress, required FROM house_progress WHERE id_map = 5;');
+          this.broadcast('houseAllProgress', { mapId: 5, rows: (allRows || []).map(r => ({ x: r.tile_x, y: r.tile_y, current: r.progress || 0, required: r.required || 50 })) });
+        } catch {}
       } catch (err) {
         console.error('Failed to build house', err);
         try { await openDB().then(db => db.exec('ROLLBACK;')); } catch {}

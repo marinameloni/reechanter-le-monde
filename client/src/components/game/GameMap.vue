@@ -226,6 +226,7 @@
 			</p>
 					<p v-if="activeMapId === 3">Flowers planted: {{ flowersPlanted }} / {{ flowersTotal }}</p>
 					<p v-else-if="activeMapId === 4">Fences built: {{ fencesBuiltCount }} / {{ fencesTotal }}</p>
+					<p v-else-if="activeMapId === 5">Houses built: {{ housesBuiltCount }} / {{ housesTotal }} | {{ housesProgressDisplay }}</p>
 					<p v-else>Factory Progress (shared - {{ mapObj.name || ('Map ' + activeMapId) }}): {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
 			<p class="controls">
 				Use arrow keys to move.
@@ -464,6 +465,18 @@ const houseProgress = ref({}); // { 'x,y': current }
 const houseRequired = 50;
 const houseWidth = 3; // tiles wide (extends left from anchor)
 const houseHeight = 2; // tiles tall (extends upward from anchor)
+
+// Houses overall progress (Map 5)
+const housesTotal = houseSites.length;
+const housesBuiltCount = computed(() => {
+	return houseSites.reduce((acc, s) => acc + (((houseProgress.value[s.key] || 0) >= houseRequired) ? 1 : 0), 0);
+});
+const housesProgressDisplay = computed(() => {
+	return houseSites.map(s => {
+		const cur = houseProgress.value[s.key] || 0;
+		return `${s.key}: ${cur} / ${houseRequired}`;
+	}).join(' | ');
+});
 
 const unwalkableCoords = [
 	[8, 0],
@@ -948,6 +961,15 @@ function registerRoomHandlers() {
 		const key = `${data.x},${data.y}`;
 		const cur = typeof data.current === 'number' ? data.current : 0;
 		houseProgress.value = { ...houseProgress.value, [key]: cur };
+	});
+	gameStore.room.onMessage('houseAllProgress', (data) => {
+		if (!data || data.mapId !== 5 || !Array.isArray(data.rows)) return;
+		const next = { ...houseProgress.value };
+		for (const r of data.rows) {
+			const key = `${r.x},${r.y}`;
+			next[key] = typeof r.current === 'number' ? r.current : 0;
+		}
+		houseProgress.value = next;
 	});
 	gameStore.room.onMessage('houseBuilt', (data) => {
 		if (!data || data.mapId !== 5) return;
