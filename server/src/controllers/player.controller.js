@@ -88,3 +88,21 @@ export async function travel(req, res) {
     res.status(500).json({ success: false, message: 'Failed to travel' });
   }
 }
+
+export async function getPlayerInfo(req, res) {
+  try {
+    const playerId = parseInt(req.params.playerId, 10);
+    if (!playerId) {
+      return res.status(400).json({ success: false, message: 'playerId is required' });
+    }
+    const db = await openDB();
+    const player = await db.get('SELECT id_player, username, color, id_map, x, y, role FROM player WHERE id_player = ?;', [playerId]);
+    if (!player) {
+      return res.status(404).json({ success: false, message: 'Player not found' });
+    }
+    res.json({ success: true, player });
+  } catch (err) {
+    console.error('Failed to get player info', err);
+    res.status(500).json({ success: false, message: 'Failed to get player info' });
+  }
+}

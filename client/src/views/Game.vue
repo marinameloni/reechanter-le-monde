@@ -41,7 +41,7 @@
 
 			<!-- Placeholder pour la future carte 2D -->
 			<section class="map-section">
-				<GameMap />
+				<GameMap v-if="isReady && startMapId != null" :initialMapId="startMapId" />
 				<pre class="debug-state">
 Tiles: {{ game.tiles.length }} | Ruins: {{ game.ruins.length }} | Buildings: {{ game.buildings.length }}
 				</pre>
@@ -55,12 +55,15 @@ import { onMounted, ref, watch } from 'vue';
 import { useAuthStore } from '../store/auth.store';
 import { useGameStore } from '../store/game.store';
 import GameMap from '../components/game/GameMap.vue';
+import api from '../services/api';
 
 const auth = useAuthStore();
 const game = useGameStore();
 
 const localColor = ref('#ccc');
 const availableColors = ['blue', 'green', 'orange', 'pink', 'purple', 'red', 'turquoise', 'yellow'];
+const startMapId = ref(auth.user?.id_map ?? null);
+const isReady = ref(false);
 
 watch(
 	() => auth.user?.color,
@@ -87,8 +90,32 @@ const handleColorChange = async (newColor) => {
 };
 
 onMounted(async () => {
-	// Connect initially to Map 1 room; GameMap will switch on travel
-	await game.connectToRoom(auth.user?.username, 1);
+	// Determine player's saved map or highest unlocked; don't render until computed
+	if (startMapId.value == null) {
+		try {
+			const id = auth.user?.id;
+			if (id) {
+				const res = await api.get(`/api/player/${id}`);
+				const m = res.data?.player?.id_map;
+				if (typeof m === 'number' && m >= 1 && m <= 5) {
+					startMapId.value = m;
+				} else {
+					// No saved map; fall back to highest unlocked
+					try {
+						const h = await api.get('/api/game/highest-unlocked');
+						const hm = h.data?.highestUnlockedMapId;
+						if (typeof hm === 'number' && hm >= 1 && hm <= 5) {
+							startMapId.value = hm;
+						}
+					} catch {}
+				}
+			}
+		} catch {}
+	}
+	// Connect to the correct room based on computed map
+	const mapToJoin = (typeof startMapId.value === 'number') ? startMapId.value : 1;
+	await game.connectToRoom(auth.user?.username, mapToJoin);
+	isReady.value = true;
 });
 </script>
 

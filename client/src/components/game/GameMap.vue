@@ -85,6 +85,35 @@
 					}"
 				></div>
 			</template>
+			<!-- Houses building overlay (Map 5) -->
+			<template v-if="activeMapId === 5">
+				<!-- Show base placeholder until built -->
+				<template v-for="site in houseSites" :key="'house-block-' + site.key">
+					<img
+						v-if="(houseProgress[site.key] || 0) < houseRequired"
+						:src="houseBaseImg"
+						alt="House Base"
+						class="house-sprite"
+						:style="{ width: (mapObj.tileSize * houseWidth) + 'px', height: (mapObj.tileSize * houseHeight) + 'px', transform: `translate(${(site.x - (houseWidth - 1)) * mapObj.tileSize}px, ${(site.y - (houseHeight - 1)) * mapObj.tileSize}px)` }"
+					/>
+					<!-- Show final house when built -->
+					<img
+						v-else
+						:src="site.img"
+						alt="House"
+						class="house-sprite"
+						:style="{ width: (mapObj.tileSize * houseWidth) + 'px', height: (mapObj.tileSize * houseHeight) + 'px', transform: `translate(${(site.x - (houseWidth - 1)) * mapObj.tileSize}px, ${(site.y - (houseHeight - 1)) * mapObj.tileSize}px)` }"
+					/>
+					<!-- Progress indicator on hover -->
+					<div
+						v-if="hoverTile && hoverTile.x === (site.x - (houseWidth - 1)) && hoverTile.y === (site.y - (houseHeight - 1))"
+						class="tile-progress"
+						:style="{ transform: `translate(${(site.x - (houseWidth - 1)) * mapObj.tileSize}px, ${((site.y - (houseHeight - 1)) * mapObj.tileSize) - 20}px)` }"
+					>
+						{{ (houseProgress[site.key] || 0) }} / {{ houseRequired }}
+					</div>
+				</template>
+			</template>
 			<!-- Fences overlay and highlights (Map 4) -->
 			<template v-if="activeMapId === 4">
 				<!-- Built fences -->
@@ -375,13 +404,20 @@ import wateringCanImg from '../../assets/sprites/item_wateringcan.png';
 import fertilizerImg from '../../assets/sprites/fertilizer.png';
 import flowersImg from '../../assets/sprites/flowers.png';
 import fenceImg from '../../assets/sprites/fence.png';
+import houseBaseImg from '../../assets/sprites/housebase.png';
+import house1Img from '../../assets/maps/house1.png';
+import house2Img from '../../assets/maps/house2.png';
+import house3Img from '../../assets/maps/house3.png';
 import Tile from './Tile.vue';
 import PlayerSprite from './PlayerSprite.vue';
 
 const auth = useAuthStore();
 const gameStore = useGameStore();
 
-const activeMapId = ref(1);
+const props = defineProps({
+	initialMapId: { type: Number, default: 1 }
+});
+const activeMapId = ref(props.initialMapId || 1);
 // Map 3 background
 const mapImage3 = mapImage3Asset;
 const mapObj = computed(() => (
@@ -417,6 +453,17 @@ const gridTiles = computed(() => Array.from({ length: mapObj.value.width * mapOb
 	x: index % mapObj.value.width,
 	y: Math.floor(index / mapObj.value.width),
 })));
+
+// Map 5 house building: sites and progress
+const houseSites = [
+		{ x: 14, y: 13, key: '14,13', img: house1Img },
+		{ x: 8, y: 7, key: '8,7', img: house2Img },
+		{ x: 28, y: 7, key: '28,7', img: house3Img },
+];
+const houseProgress = ref({}); // { 'x,y': current }
+const houseRequired = 50;
+const houseWidth = 3; // tiles wide (extends left from anchor)
+const houseHeight = 2; // tiles tall (extends upward from anchor)
 
 const unwalkableCoords = [
 	[8, 0],
@@ -721,6 +768,13 @@ function isFactoryTile(x, y) {
 function handleTileHover(tile) {
 	if (activeMapId.value === 3 && isFactoryTile(tile.x, tile.y)) {
 		hoverTile.value = { x: tile.x, y: tile.y };
+	} else if (activeMapId.value === 5) {
+		const site = houseSites.find(s => tile.x >= (s.x - (houseWidth - 1)) && tile.x <= s.x && tile.y >= (s.y - (houseHeight - 1)) && tile.y <= s.y);
+		if (site) {
+			hoverTile.value = { x: site.x - (houseWidth - 1), y: site.y - (houseHeight - 1) };
+		} else {
+			hoverTile.value = null;
+		}
 	} else {
 		hoverTile.value = null;
 	}
@@ -888,6 +942,29 @@ function registerRoomHandlers() {
 		// Adjust total by reinitializing map4FenceTargetsSet if server provides `total`
 		// Here we trust initial targets; `built` updates come via fenceBuilt events.
 	});
+	// House progress for Map 5
+	gameStore.room.onMessage('houseProgress', (data) => {
+		if (!data || data.mapId !== 5) return;
+		const key = `${data.x},${data.y}`;
+		const cur = typeof data.current === 'number' ? data.current : 0;
+		houseProgress.value = { ...houseProgress.value, [key]: cur };
+	});
+	gameStore.room.onMessage('houseBuilt', (data) => {
+		if (!data || data.mapId !== 5) return;
+		const key = `${data.x},${data.y}`;
+		houseProgress.value = { ...houseProgress.value, [key]: houseRequired };
+		showBanner('A house has been completed!', 'success');
+	});
+	gameStore.room.onMessage('inventoryUpdate', (data) => {
+		if (!data) return;
+		if (typeof data.rocks === 'number') rocks.value = data.rocks;
+		if (typeof data.bricks === 'number') bricks.value = data.bricks;
+	});
+	gameStore.room.onMessage('houseError', (data) => {
+		if (data?.reason === 'insufficient_rocks') {
+			showBanner('You need rocks to contribute.', 'warning');
+		}
+	});
 	roomHandlersBound.value = true;
 }
 
@@ -917,15 +994,7 @@ watch(() => showTradeForm.value, (v) => {
 });
 
 // Auto-travel to Map 5 when all fences are built on Map 4
-watch([
-	() => fencesBuiltCount.value,
-	() => fencesTotal.value,
-	() => activeMapId.value
-], ([built, total, id]) => {
-	if (id === 4 && total > 0 && built >= total) {
-		tryTravelToMap5();
-	}
-});
+// Removed auto-travel: player must use the gate to travel
 
 function respondTrade(accepted) {
 	if (!incomingTrade.value || !gameStore.room) { incomingTrade.value = null; return; }
@@ -1042,6 +1111,17 @@ function showBanner(msg, type = '') {
 }
 function isBlocked(x, y) {
 	const key = `${x},${y}`;
+	// On Map 5, block tiles occupied by house footprints; otherwise allow
+	if (activeMapId.value === 5) {
+		for (const s of houseSites) {
+			const left = s.x - (houseWidth - 1);
+			const top = s.y - (houseHeight - 1);
+			if (x >= left && x <= s.x && y >= top && y <= s.y) {
+				return true;
+			}
+		}
+		return false;
+	}
 	// On Map 4, remove all ruins/factory blocking; keep only perimeter trees
 	if (activeMapId.value === 4) {
 		const w = mapObj.value.width;
@@ -1187,6 +1267,33 @@ function handleTileClick(tile) {
 				}
 			} else {
 				showBanner('Need 10 wood to build a fence.', 'warning');
+			}
+			return;
+		}
+	}
+	// Map 5 interactions: contribute rocks to build houses
+	if (activeMapId.value === 5) {
+		const site = houseSites.find(s => tile.x >= (s.x - (houseWidth - 1)) && tile.x <= s.x && tile.y >= (s.y - (houseHeight - 1)) && tile.y <= s.y);
+		if (site) {
+			const cur = houseProgress.value[site.key] || 0;
+			if (cur >= houseRequired) {
+				showBanner('House already completed here.', 'success');
+				return;
+			}
+			if ((rocks.value || 0) <= 0) {
+				showBanner('You need rocks to contribute.', 'warning');
+				return;
+			}
+			// Optimistic local decrement; server will confirm
+			rocks.value = (rocks.value || 0) - 1;
+			if (gameStore.room) {
+				try {
+					// Send canonical site coordinates (anchor) to match server keys
+					gameStore.room.send('buildHouse', { x: site.x, y: site.y });
+					showBanner('Contributed 1 rock to a house!', 'success');
+				} catch (err) {
+					console.error('Failed to send buildHouse', err);
+				}
 			}
 			return;
 		}
@@ -1509,26 +1616,27 @@ async function tryTravelToMap4() {
 		try { gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value }); } catch (err) {}
 		activeMapId.value = 4;
 		showBanner('Traveled to Map 4!', 'success');
-	async function tryTravelToMap5() {
-		const playerId = auth.user?.id;
-		if (!playerId) return;
-		try {
-			const target = map5;
-			const cx = Math.floor(target.width / 2);
-			const cy = Math.floor(target.height / 2);
-			await api.post('/api/player/travel', { playerId, mapId: 5, x: cx, y: cy });
-			playerX.value = cx;
-			playerY.value = cy;
-			await gameStore.switchRoom(auth.user?.username, 5);
-			try { gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value }); } catch (err) {}
-			activeMapId.value = 5;
-			showBanner('Traveled to Map 5!', 'success');
-		} catch (err) {
-			console.error('Failed to travel to map 5', err);
-		}
-	}
 	} catch (err) {
 		console.error('Failed to travel to map 4', err);
+	}
+}
+
+async function tryTravelToMap5() {
+	const playerId = auth.user?.id;
+	if (!playerId) return;
+	try {
+		const target = map5;
+		const cx = Math.floor(target.width / 2);
+		const cy = Math.floor(target.height / 2);
+		await api.post('/api/player/travel', { playerId, mapId: 5, x: cx, y: cy });
+		playerX.value = cx;
+		playerY.value = cy;
+		await gameStore.switchRoom(auth.user?.username, 5);
+		try { gameStore.room.send('updatePosition', { x: playerX.value, y: playerY.value }); } catch (err) {}
+		activeMapId.value = 5;
+		showBanner('Traveled to Map 5!', 'success');
+	} catch (err) {
+		console.error('Failed to travel to map 5', err);
 	}
 }
 </script>
@@ -1597,6 +1705,15 @@ async function tryTravelToMap4() {
 	left: 0;
 	width: 64px;
 	height: 64px;
+	image-rendering: pixelated;
+	z-index: 9;
+	pointer-events: none;
+}
+
+.house-sprite {
+	position: absolute;
+	top: 0;
+	left: 0;
 	image-rendering: pixelated;
 	z-index: 9;
 	pointer-events: none;

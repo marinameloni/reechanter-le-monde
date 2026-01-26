@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { postProgress, postTransfer, postExchange } from '../controllers/game.controller.js';
+import { postProgress, postTransfer, postExchange, getHighestUnlockedMap } from '../controllers/game.controller.js';
 
 const router = Router();
 
@@ -7,5 +7,6 @@ const router = Router();
 router.post('/progress', postProgress);
 router.post('/trade/transfer', postTransfer);
 router.post('/trade/exchange', postExchange);
+router.get('/highest-unlocked', getHighestUnlockedMap);
 
 export default router;

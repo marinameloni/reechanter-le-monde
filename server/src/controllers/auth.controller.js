@@ -4,6 +4,38 @@ import jwt from 'jsonwebtoken';
 
 const SECRET = 'supersecretkey'; // à mettre en env plus tard
 
+async function computeHighestUnlockedMap(db) {
+  let highest = 1;
+  try {
+    const fp1 = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = 1;');
+    if (fp1 && (fp1.clicks_current || 0) >= (fp1.clicks_required || 500)) {
+      highest = Math.max(highest, 2);
+    }
+
+    const fp2 = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = 2;');
+    if (fp2 && (fp2.clicks_current || 0) >= (fp2.clicks_required || 1000)) {
+      highest = Math.max(highest, 3);
+    }
+
+    const fTotal3 = await db.get('SELECT COUNT(*) as total FROM flower_progress WHERE id_map = 3;');
+    const fRemaining3 = await db.get('SELECT COUNT(*) as remaining FROM flower_progress WHERE id_map = 3 AND water_current < water_required;');
+    if ((fTotal3?.total || 0) > 0 && (fRemaining3?.remaining || 0) === 0) {
+      highest = Math.max(highest, 4);
+    }
+
+    const fenceCounts4 = await db.get('SELECT SUM(built) as built_count, COUNT(*) as total_count FROM fence_progress WHERE id_map = 4;');
+    const built = fenceCounts4?.built_count || 0;
+    const total = fenceCounts4?.total_count || 0;
+    if (total > 0 && built >= total) {
+      highest = Math.max(highest, 5);
+    }
+  } catch (err) {
+    // fall back to 1 on errors
+    highest = 1;
+  }
+  return highest;
+}
+
 export async function signup(req, res) {
   try {
     const { username, email, password, color } = req.body;
@@ -40,6 +72,13 @@ export async function signup(req, res) {
       [result.lastID]
     );
 
+    // Set player's starting map to highest unlocked at signup
+    try {
+      const highest = await computeHighestUnlockedMap(db);
+      await db.run('UPDATE player SET id_map = ? WHERE id_player = ?;', [highest, player.id_player]);
+      player.id_map = highest;
+    } catch {}
+
     const token = jwt.sign({ id_player: player.id_player, username: player.username }, SECRET, {
       expiresIn: '1d',
     });
@@ -52,6 +91,7 @@ export async function signup(req, res) {
         username: player.username,
         email: player.email,
         color: player.color,
+        id_map: player.id_map,
         role: 'user',
       },
     });
@@ -117,6 +157,16 @@ export async function login(req, res) {
       expiresIn: '1d',
     });
 
+    // Ensure player's map is at least highest unlocked on login
+    try {
+      const highest = await computeHighestUnlockedMap(db);
+      const currentMap = typeof player.id_map === 'number' ? player.id_map : 1;
+      if (currentMap < highest) {
+        await db.run('UPDATE player SET id_map = ? WHERE id_player = ?;', [highest, player.id_player]);
+        player.id_map = highest;
+      }
+    } catch {}
+
     res.json({
       success: true,
       token,
@@ -125,6 +175,7 @@ export async function login(req, res) {
         username: player.username,
         email: player.email,
         color: player.color,
+        id_map: player.id_map,
         role: player.role || (player.username === 'admin' ? 'admin' : 'user'),
       },
     });

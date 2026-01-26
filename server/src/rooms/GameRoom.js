@@ -197,6 +197,63 @@ export class GameRoom extends Room {
       }
     });
 
+    // Shared house building on Map 5: each contribution spends 1 rock and adds 1 progress; 50 required per house
+    this.onMessage("buildHouse", async (client, data) => {
+      const x = (data && typeof data.x === 'number') ? data.x : null;
+      const y = (data && typeof data.y === 'number') ? data.y : null;
+      const mapId = this.mapId ?? 5;
+      if (x == null || y == null) return;
+      if (mapId !== 5) return; // only valid in Map 5 room
+      const validSites = new Set(['14,13','8,7','28,7']);
+      const key = `${x},${y}`;
+      if (!validSites.has(key)) return;
+      try {
+        const db = await openDB();
+        await db.exec('BEGIN TRANSACTION;');
+        // Ensure progress row exists
+        const row = await db.get('SELECT progress, required FROM house_progress WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [x, y]);
+        if (!row) {
+          await db.run('INSERT INTO house_progress (id_map, tile_x, tile_y, progress, required) VALUES (5, ?, ?, 0, 50);', [x, y]);
+        }
+
+        // Find contributing player and check rocks
+        const me = this.state.clients.find(c => c.sessionId === client.sessionId);
+        const idPlayer = me && me.id_player;
+        if (!idPlayer) { await db.exec('ROLLBACK;'); return; }
+        const inv = await db.get('SELECT rocks FROM inventory WHERE id_player = ?;', [idPlayer]);
+        if (!inv) {
+          // initialize inventory if missing
+          await db.run('INSERT INTO inventory (id_player, bricks, rocks) VALUES (?, 0, 0);', [idPlayer]);
+        }
+        const curInv = inv || { rocks: 0 };
+        if ((curInv.rocks || 0) <= 0) {
+          await db.exec('ROLLBACK;');
+          // notify only this client insufficient resources
+          client.send('houseError', { x, y, reason: 'insufficient_rocks' });
+          return;
+        }
+
+        // Spend 1 rock and add progress (capped at required)
+        await db.run('UPDATE inventory SET rocks = rocks - 1 WHERE id_player = ? AND rocks > 0;', [idPlayer]);
+        await db.run('UPDATE house_progress SET progress = MIN(required, progress + 1) WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [x, y]);
+        const updated = await db.get('SELECT progress, required FROM house_progress WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [x, y]);
+        const newInv = await db.get('SELECT bricks, rocks FROM inventory WHERE id_player = ?;', [idPlayer]);
+        await db.exec('COMMIT;');
+
+        // Update contributing player's inventory
+        try { client.send('inventoryUpdate', { bricks: newInv?.bricks || 0, rocks: newInv?.rocks || 0 }); } catch {}
+
+        // Broadcast progress to all
+        this.broadcast('houseProgress', { mapId: 5, x, y, current: updated.progress || 0, required: updated.required || 50 });
+        if ((updated.progress || 0) >= (updated.required || 50)) {
+          this.broadcast('houseBuilt', { mapId: 5, x, y });
+        }
+      } catch (err) {
+        console.error('Failed to build house', err);
+        try { await openDB().then(db => db.exec('ROLLBACK;')); } catch {}
+      }
+    });
+
     // Partner sends counter-offer back to proposer
     this.onMessage("tradeCounterOffer", (client, data) => {
       const from = this.state.clients.find(c => c.sessionId === client.sessionId);
@@ -326,6 +383,35 @@ export class GameRoom extends Room {
           }
         }
         client.send('fenceCount', { mapId: 4, built: builtCount, total: totalCount });
+      }
+
+      // House building progress only if this is Map 5
+      if (this.mapId === 5) {
+        // ensure progress table exists
+        await db.run(`CREATE TABLE IF NOT EXISTS house_progress (
+          id_map INTEGER,
+          tile_x INTEGER,
+          tile_y INTEGER,
+          progress INTEGER DEFAULT 0,
+          required INTEGER DEFAULT 50,
+          PRIMARY KEY (id_map, tile_x, tile_y)
+        );`);
+        const houseSites = [
+          { x: 14, y: 13 },
+          { x: 8, y: 7 },
+          { x: 28, y: 7 },
+        ];
+        // initialize rows if missing
+        for (const s of houseSites) {
+          const row = await db.get('SELECT progress, required FROM house_progress WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [s.x, s.y]);
+          if (!row) {
+            await db.run('INSERT INTO house_progress (id_map, tile_x, tile_y, progress, required) VALUES (5, ?, ?, 0, 50);', [s.x, s.y]);
+          }
+        }
+        const rows = await db.all('SELECT id_map, tile_x, tile_y, progress, required FROM house_progress WHERE id_map = 5;');
+        for (const r of rows || []) {
+          client.send('houseProgress', { mapId: r.id_map, x: r.tile_x, y: r.tile_y, current: r.progress || 0, required: r.required || 50 });
+        }
       }
     } catch (err) {
       console.error('Failed to load factory progress on join', err);
