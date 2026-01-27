@@ -15,7 +15,7 @@ const { json } = bodyParser;
 
 // --- Express HTTP API (REST) + Colyseus on the same HTTP server ---
 const app = express();
-app.use(cors({ origin: 'http://server:3000' }));
+app.use(cors({ origin: 'http://193.168.146.9:3001' }));
 app.use(json());
 
 // routes REST classiques

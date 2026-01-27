@@ -17,7 +17,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://server:3001
+      - VITE_API_URL=http://193.168.146.9:3001
     depends_on:
       - server
     networks:

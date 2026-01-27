@@ -30,7 +30,7 @@ export const useGameStore = defineStore('game', {
                                              if (port === '3000') return `${wsProto}//${hostname}:3001/colyseus`;
                                              return `${wsProto}//${hostname}/colyseus`;
                                          } catch {
-                                             const apiUrl = import.meta.env.VITE_API_URL || 'http://server:3001';
+                                             const apiUrl = import.meta.env.VITE_API_URL || 'http://193.168.146.9:3001';
                                              return apiUrl.replace(/^http/, 'ws') + '/colyseus';
                                          }
                                      })();
@@ -77,7 +77,7 @@ export const useGameStore = defineStore('game', {
                                              if (port === '3000') return `${wsProto}//${hostname}:3001/colyseus`;
                                              return `${wsProto}//${hostname}/colyseus`;
                                          } catch {
-                                             const apiUrl = import.meta.env.VITE_API_URL || 'http://server:3001';
+                                             const apiUrl = import.meta.env.VITE_API_URL || 'http://193.168.146.9:3001';
                                              return apiUrl.replace(/^http/, 'ws') + '/colyseus';
                                          }
                                      })();

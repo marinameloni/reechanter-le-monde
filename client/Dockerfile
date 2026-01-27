@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY . .
 
-ENV VITE_API_URL=http://server:3001
+ENV VITE_API_URL=http://193.168.146.9:3001
 
 RUN npm run build
 
