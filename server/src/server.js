@@ -15,7 +15,7 @@ const { json } = bodyParser;
 
 // --- Express HTTP API (REST) + Colyseus on the same HTTP server ---
 const app = express();
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: 'http://server:3000' }));
 app.use(json());
 
 // routes REST classiques
@@ -38,5 +38,5 @@ gameServer
   .filterBy(['mapId']);
 
 const PORT = 3001;
-gameServer.listen(PORT);
-console.log(`HTTP + Colyseus listening on http://localhost:${PORT} (ws sur le même port)`);
+gameServer.listen(PORT, "0.0.0.0");
+console.log(`HTTP + Colyseus listening on http://0.0.0.0:${PORT} (ws sur le même port)`);
