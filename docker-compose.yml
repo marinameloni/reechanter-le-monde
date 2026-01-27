@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  server:
+    build: ./server
+    container_name: mmo-server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    networks:
+      - mmo-net
+
+  client:
+    build: ./client
+    container_name: mmo-client
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    depends_on:
+      - server
+    networks:
+      - mmo-net
+
+networks:
+  mmo-net:
+    driver: bridge
