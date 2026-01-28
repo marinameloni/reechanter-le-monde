@@ -63,7 +63,8 @@ const game = useGameStore();
 
 const localColor = ref('#ccc');
 const availableColors = ['blue', 'green', 'orange', 'pink', 'purple', 'red', 'turquoise', 'yellow'];
-const startMapId = ref(auth.user?.id_map ?? null);
+// default to `true` to ensure the map renders immediately when no saved map is present
+const startMapId = ref(auth.user?.id_map ?? true);
 const isReady = ref(false);
 
 watch(
@@ -114,7 +115,8 @@ onMounted(async () => {
 		} catch {}
 	}
 	// Connect to the correct room based on computed map
-	const mapToJoin = (typeof startMapId.value === 'number') ? startMapId.value : 1;
+	// coerce boolean `true` to map 1 (Number(true) === 1)
+	const mapToJoin = Number(startMapId.value) || 1;
 	await game.connectToRoom(auth.user?.username, mapToJoin);
 	isReady.value = true;
 });

@@ -222,8 +222,25 @@
 					<li>Did nothing: {{ leaderboard.didNothing || '—' }}</li>
 				</ul>
 			</div>
+
+			<!-- In-map chat sender (bottom center, styled like classic arcade/chat bar) -->
+			<div class="chat-input map-chat" role="form">
+				<input type="text" v-model.trim="chatInput" placeholder="Say something..." @keydown.enter="sendChat" />
+				<button class="btn" @click="sendChat">Send</button>
+			</div>
+
+			<!-- Map debug overlay (appears when map health check fails) -->
+			<div v-if="showMapDebug" class="map-debug">
+				<div class="map-debug-row"><strong>Map Debug</strong></div>
+				<div class="map-debug-row">activeMapId: {{ activeMapId }}</div>
+				<div class="map-debug-row">mapImage: {{ mapImage }}</div>
+				<div class="map-debug-row">mapObj: {{ mapObj.width }} x {{ mapObj.height }} @ tileSize {{ mapObj.tileSize }}</div>
+				<div class="map-debug-row">wrapper: {{ wrapperStyle.width }} x {{ wrapperStyle.height }}</div>
+				<div class="map-debug-row">message: {{ mapDebugMessage }}</div>
+			</div>
 		</div>
-		<div class="hud">
+			<!-- Chat input placed inside map wrapper (visual overlay) -->
+			<div class="hud">
 			<p>Position: ({{ playerX }}, {{ playerY }})</p>
 			<div v-if="bannerMessage" :class="['banner', bannerType]">{{ bannerMessage }}</div>
 			<p>
@@ -240,12 +257,9 @@
 					<p v-else>Factory Progress (shared - {{ mapObj.name || ('Map ' + activeMapId) }}): {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
 			<p class="controls">
 				Use arrow keys to move.
-				Press Space or E to interact with factories/ruins.
+				Click to interact with tiles, NPC, and other players.
 			</p>
-			<div class="chat-input">
-				<input type="text" v-model.trim="chatInput" placeholder="Say something..." @keydown.enter="sendChat" />
-				<button class="btn" @click="sendChat">Send</button>
-			</div>
+			<!-- hud chat-input removed from here; it is rendered inside the map wrapper for in-map placement -->
 		</div>
 
 		<!-- Simple Exchange Modal -->
@@ -445,6 +459,34 @@ const mapImage = computed(() => (
 	activeMapId.value === 4 ? mapImage4 :
 	mapImage5
 ));
+
+// Debug overlay helper: shown automatically when map image or computed wrapper size looks invalid
+const showMapDebug = ref(false);
+const mapDebugMessage = ref('');
+
+function checkMapHealth() {
+	try {
+		const mi = mapImage.value;
+		const w = parseInt((wrapperStyle.value.width || '').toString(), 10) || 0;
+		const h = parseInt((wrapperStyle.value.height || '').toString(), 10) || 0;
+		if (!mi) {
+			mapDebugMessage.value = 'mapImage is falsy';
+			showMapDebug.value = true;
+			return;
+		}
+		if (w <= 0 || h <= 0) {
+			mapDebugMessage.value = `wrapper size invalid: ${w}x${h}`;
+			showMapDebug.value = true;
+			return;
+		}
+		// otherwise hide debug overlay
+		showMapDebug.value = false;
+		mapDebugMessage.value = '';
+	} catch (e) {
+		showMapDebug.value = true;
+		mapDebugMessage.value = String(e?.message || e);
+	}
+}
 
 const wrapperStyle = computed(() => ({
 	width: mapObj.value.width * mapObj.value.tileSize + 'px',
@@ -1556,8 +1598,22 @@ function handleKeyDown(event) {
 		movePlayer(-1, 0);
 	} else if (event.key === 'ArrowRight') {
 		movePlayer(1, 0);
-	} else if (event.key === ' ' || event.key === 'e' || event.key === 'E') {
-		interact();
+	} else if (
+		// AZERTY movement: z (up), s (down), q (left), d (right)
+		event.key === 'z' || event.key === 'Z' ||
+		event.key === 's' || event.key === 'S' ||
+		event.key === 'q' || event.key === 'Q' ||
+		event.key === 'd' || event.key === 'D' ||
+		// fallback to space / E
+		event.key === ' ' || event.key === 'e' || event.key === 'E'
+	) {
+		// handle AZERTY key movement
+		if (event.key === 'z' || event.key === 'Z') movePlayer(0, -1);
+		else if (event.key === 's' || event.key === 'S') movePlayer(0, 1);
+		else if (event.key === 'q' || event.key === 'Q') movePlayer(-1, 0);
+		else if (event.key === 'd' || event.key === 'D') movePlayer(1, 0);
+		else interact();
+		// no-op: handled above
 	}
 }
 
@@ -1572,6 +1628,15 @@ onMounted(async () => {
 	const startCy = Math.floor(mapObj.value.height / 2);
 	playerX.value = startCx;
 	playerY.value = startCy;
+
+	// Debug: expose map computed values to console to help diagnose render issues
+	try {
+		console.debug('GameMap mounted', { activeMapId: activeMapId.value, mapObj: mapObj.value, mapImage: mapImage.value, wrapperStyle: wrapperStyle.value });
+	} catch (e) {}
+
+	// Run health check once and again shortly after render to catch async asset loads
+	checkMapHealth();
+	setTimeout(checkMapHealth, 200);
 
 	// Load inventory + tools from server
 	const playerId = auth.user?.id;
@@ -1805,14 +1870,59 @@ async function tryTravelToMap5() {
 	display: flex;
 	gap: 6px;
 	align-items: center;
-	margin-top: 6px;
 }
-.chat-input input[type='text'] {
+
+/* In-map chat: bottom-centered pill bar */
+.chat-input.map-chat {
+	position: absolute;
+	bottom: 12px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 60;
+	width: min(860px, calc(100% - 48px));
+	max-width: 860px;
+	padding: 6px 10px;
+	border-radius: 28px;
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	background: linear-gradient(180deg, #0b4f8a 0%, #0370c7 100%);
+	box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+}
+.chat-input.map-chat input[type='text'] {
 	flex: 1;
-	padding: 6px 8px;
-	border: 1px solid #ccc;
-	border-radius: 6px;
+	padding: 8px 12px;
+	border-radius: 18px;
+	border: none;
+	outline: none;
+	background: rgba(255,255,255,0.98);
+	font-size: 14px;
 }
+.chat-input.map-chat button {
+	padding: 8px 12px;
+	border-radius: 14px;
+	border: none;
+	background: #fff;
+	color: #0370c7;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+/* Map debug overlay */
+.map-debug {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	z-index: 80;
+	background: rgba(0,0,0,0.7);
+	color: #fff;
+	padding: 8px 10px;
+	border-radius: 6px;
+	font-size: 12px;
+	line-height: 1.2;
+	max-width: 320px;
+}
+.map-debug-row { margin: 4px 0; }
 
 .hud {
 
