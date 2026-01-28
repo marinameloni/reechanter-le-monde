@@ -1219,12 +1219,18 @@ function doFactoryClick(x, y) {
 		sendProgress({ deltaBricks: 1, deltaWorldScore: 1 });
 	}
 	// Send shared increment to server so everyone sees the same total
-	if (gameStore.room) {
-		try {
-			gameStore.room.send('factoryClick', { mapId: activeMapId.value, inc: clickMultiplier.value });
-		} catch (err) {
-			console.error('Failed to send factoryClick', err);
+	// Queue click locally and let the store flush batched sends every 500ms.
+	// This provides immediate UI feedback while avoiding many concurrent DB writes.
+	try {
+		// Try to find a matching ruin id by coordinates to keep UI optimistic per-ruin
+		let ruinId = null;
+		if (gameStore.ruins && Array.isArray(gameStore.ruins)) {
+			const r = gameStore.ruins.find(rr => rr && (rr.x === x && rr.y === y));
+			if (r) ruinId = r.id_ruin || r.id;
 		}
+		gameStore.queueFactoryClick(ruinId, clickMultiplier.value);
+	} catch (err) {
+		console.error('Failed to queue factory click', err);
 	}
 }
 

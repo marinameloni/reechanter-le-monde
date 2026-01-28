@@ -118,33 +118,83 @@ export class GameRoom extends Room {
     });
 
     // Shared factory clicks per map
-    this.onMessage("factoryClick", async (client, data) => {
-      const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
+    // We buffer clicks per-player and flush them every 500ms to avoid SQLite concurrency issues.
+    this.pendingFactoryClicks = new Map(); // sessionId -> accumulated clicks
+
+    // Called regularly to persist batched clicks in a single DB transaction
+    this.flushFactoryClicks = async () => {
+      if (!this.pendingFactoryClicks || this.pendingFactoryClicks.size === 0) return;
+      // Aggregate total clicks across players
+      let total = 0;
+      for (const v of this.pendingFactoryClicks.values()) total += v || 0;
+      if (total <= 0) {
+        this.pendingFactoryClicks.clear();
+        return;
+      }
+
       const mapId = this.mapId ?? 1;
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');
-        const row = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = ?;', mapId);
+        const row = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = ?;', [mapId]);
         if (!row) {
-          // initialize if not existing
-          await db.run('INSERT INTO factory_progress (id_map, clicks_current, clicks_required) VALUES (?, 0, 500);', mapId);
+          await db.run('INSERT INTO factory_progress (id_map, clicks_current, clicks_required) VALUES (?, 0, 500);', [mapId]);
         }
         await db.run(
           `UPDATE factory_progress
            SET clicks_current = clicks_current + ?, updated_at = CURRENT_TIMESTAMP
            WHERE id_map = ?;`,
-          [inc, mapId]
+          [total, mapId]
         );
-        const updated = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = ?;', mapId);
+        const updated = await db.get('SELECT clicks_current, clicks_required FROM factory_progress WHERE id_map = ?;', [mapId]);
         await db.exec('COMMIT;');
 
-        // Broadcast updated progress to all
+        // Broadcast updated progress to all clients
         this.broadcast('factoryProgress', { mapId, clicksCurrent: updated.clicks_current || 0, clicksRequired: updated.clicks_required || 500 });
         if ((updated.clicks_current || 0) >= (updated.clicks_required || 500)) {
           this.broadcast('mapUnlocked', { mapId: mapId + 1 });
         }
+
+        // Optionally, send per-player ack for their queued contributions
+        for (const [sessionId, clicks] of this.pendingFactoryClicks.entries()) {
+          try {
+            const playerClient = this.clients.find(c => c.sessionId === sessionId);
+            if (playerClient) {
+              // send targeted ack (best-effort)
+              this.clientByUsername.get(playerClient.username)?.send('factoryClickFlushed', { inc: clicks, mapId });
+            }
+          } catch {}
+        }
       } catch (err) {
-        console.error('Failed to update factory progress', err);
+        console.error('Failed to flush factory clicks', err);
+        try { const db2 = await openDB(); await db2.exec('ROLLBACK;'); } catch {}
+      } finally {
+        this.pendingFactoryClicks.clear();
+      }
+    };
+
+    // Start periodic flush every 500ms
+    this._factoryFlushInterval = setInterval(() => { this.flushFactoryClicks().catch(e => console.error(e)); }, 500);
+
+    // Accept individual or batched messages and buffer them
+    this.onMessage("factoryClick", (client, data) => {
+      const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
+      const sid = client.sessionId;
+      const prev = this.pendingFactoryClicks.get(sid) || 0;
+      this.pendingFactoryClicks.set(sid, prev + inc);
+      // Immediate ack so client can update local UI optimistically
+      try { client.send('factoryClickQueued', { inc }); } catch {}
+    });
+
+    // Backwards-compatible alias: clients may send a batched message named "clickFactory"
+    this.onMessage('clickFactory', (client, data) => {
+      // data: { inc: number }
+      const inc = (data && typeof data.inc === 'number') ? data.inc : 0;
+      if (inc > 0) {
+        const sid = client.sessionId;
+        const prev = this.pendingFactoryClicks.get(sid) || 0;
+        this.pendingFactoryClicks.set(sid, prev + inc);
+        try { client.send('factoryClickQueued', { inc }); } catch {}
       }
     });
 
@@ -520,5 +570,10 @@ export class GameRoom extends Room {
 
     // met à jour la liste côté clients
     this.broadcast("clients", this.state.clients);
+  }
+
+  // Clean up intervals when room is disposed
+  onDispose() {
+    try { clearInterval(this._factoryFlushInterval); } catch {}
   }
 }
