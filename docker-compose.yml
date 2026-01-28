@@ -5,8 +5,6 @@ services:
     build: ./server
     container_name: mmo-server
     restart: unless-stopped
-    ports:
-      - "3001:3001"
     networks:
       - mmo-net
 
@@ -14,14 +12,26 @@ services:
     build: ./client
     container_name: mmo-client
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      - VITE_API_URL=http://193.168.146.9:3001
-    depends_on:
-      - server
+      - VITE_API_URL=/api  # <- important, pointe vers le proxy
     networks:
       - mmo-net
+    depends_on:
+      - server
+
+  nginx:
+    image: nginx:latest
+    container_name: mmo-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - mmo-net
+    depends_on:
+      - client
+      - server
 
 networks:
   mmo-net:
