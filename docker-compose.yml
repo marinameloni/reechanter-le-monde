@@ -26,12 +26,12 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx-conf:/etc/nginx/conf.d:ro  # monte le dossier entier
+    - /data/compose/4/nginx-conf:/etc/nginx/conf.d:ro
     networks:
-      - mmo-net
+    - mmo-net
     depends_on:
-      - client
-      - server
+    - client
+    - server
 
 networks:
   mmo-net:
