@@ -27,6 +27,11 @@ app.use('/api/game', gameRoutes);
 app.use('/api/player', playerRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Quick health / root endpoint for the API (prevents Nginx "Cannot GET /")
+app.get('/api', (req, res) => {
+  res.json({ ok: true, msg: 'API root' });
+});
+
 // Crée le serveur HTTP partagé entre Express et Colyseus
 const server = createServer(app);
 
