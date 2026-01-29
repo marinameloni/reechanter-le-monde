@@ -4,7 +4,13 @@ import axios from 'axios';
 // Priorité à VITE_API_URL; sinon fallback intelligent selon l'environnement
 function resolveApiBaseURL() {
 	const envUrl = (import.meta.env && import.meta.env.VITE_API_URL) || '';
-	if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) return envUrl.trim();
+	if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) {
+		const v = envUrl.trim();
+		// If user supplied a relative '/api' as build arg, avoid duplicating '/api' in requests
+		if (v === '/api') return '';
+		// strip trailing slash for consistency
+		return v.endsWith('/') ? v.replace(/\/$/, '') : v;
+	}
 
 	// Fallback: si on sert le front sur :3000 (dev/prod sans proxy), cible :3001/api
 	// Sinon, même origine avec préfixe /api (utile derrière Nginx)
