@@ -12,6 +12,6 @@ export default defineConfig({
 
   preview: {
     // autorise ton domaine pour la preview ou build prod
-    allowedHosts: ['repairloop.paasul.fr', 'localhost', '127.0.0.1'],
+    allowedHosts: ['repairloop.paasul.fr', 'localhost', '193.168.146.9:3000'],
   },
 });
