@@ -27,7 +27,7 @@ services:
     - "80:80"
     volumes:
     - /data/compose/4/nginx-conf:/etc/nginx/conf.d:ro
-    - /data/compose/4/client/dist:/usr/share/nginx/html:ro  # le front build
+    - /data/compose/4/client/dist:/usr/share/nginx/html:ro  
     networks:
     - mmo-net
     depends_on:
