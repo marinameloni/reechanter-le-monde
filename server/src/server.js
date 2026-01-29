@@ -16,7 +16,10 @@ const { json } = bodyParser;
 // --- Express HTTP API (REST) + Colyseus on the same HTTP server ---
 const app = express();
 app.use(cors({
-  origin: 'http://193.168.146.9:3000', // ton front
+  origin: [
+    'https://repairloop.paasul.fr', // production front
+    'http://193.168.146.9:3000', // dev front (legacy)
+  ],
   credentials: true,                   // si tu utilises cookies
 }));
 app.use(json());

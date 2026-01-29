@@ -2,37 +2,28 @@ version: "3.8"
 
 services:
   server:
-    build: ./server
-    container_name: mmo-server
-    restart: unless-stopped
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
     networks:
       - mmo-net
+    restart: unless-stopped
 
   client:
-    build: ./client
-    container_name: mmo-client
-    restart: unless-stopped
-    environment:
-      - VITE_API_URL=/api
-    networks:
-      - mmo-net
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "/api"
+    ports:
+      - "80:80"
     depends_on:
       - server
-
-  nginx:
-    image: nginx:latest
-    container_name: mmo-nginx
-    restart: unless-stopped
-    ports:
-    - "80:80"
-    volumes:
-    - /data/compose/4/nginx-conf:/etc/nginx/conf.d:ro
-    - /data/compose/4/client/dist:/usr/share/nginx/html:ro  
     networks:
-    - mmo-net
-    depends_on:
-    - client
-    - server
+      - mmo-net
+    restart: unless-stopped
 
 networks:
   mmo-net:
