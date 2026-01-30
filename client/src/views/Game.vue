@@ -15,21 +15,6 @@
 			<p v-else-if="!game.connected">Connexion au serveur de jeu en cours...</p>
 			<p v-else>Connecté au serveur temps réel (Colyseus).</p>
 
-      <section v-if="auth.user" class="color-customization">
-        <label>
-          Couleur du robot :
-          <div class="color-selector">
-            <div
-              v-for="c in availableColors"
-              :key="c"
-              class="color-option"
-              :class="{ selected: localColor === c }"
-              :style="{ backgroundColor: c }"
-              @click="handleColorChange(c)"
-            ></div>
-          </div>
-        </label>
-      </section>
 
 			<section class="players" v-if="game.clients.length">
 				<h2>Joueurs connectés</h2>

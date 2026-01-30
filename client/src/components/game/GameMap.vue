@@ -1,6 +1,34 @@
 <template>
 	<div class="game-map">
+		<!-- persistent background audio element (kept mounted so closing modals won't stop playback) -->
+		<audio ref="bgMusic" id="bg-music" :src="musicSrc" preload="auto" loop style="display:none"></audio>
 		<div class="map-wrapper" :style="wrapperStyle">
+			<!-- Top-left quick action buttons inside the game screen -->
+			<div class="map-top-left-buttons" role="group" aria-label="Quick actions">
+				<button class="ml-btn" title="Settings" @click.prevent="openSettings">
+					<span class="ml-inner">
+						<img src="../../assets/sprites/settinglogo.png">
+					</span>
+				</button>
+				<button class="ml-btn" title="User" @click.prevent="openUser">
+					<span class="ml-inner">👤</span>
+				</button>
+				<button class="ml-btn" title="Map" @click.prevent>
+					<span class="ml-inner">
+						<img src="../../assets/sprites/mapicon.png">
+					</span>
+				</button>
+			</div>
+
+			<!-- Top-right resource/value display -->
+			<div class="top-right-values" aria-hidden="false">
+				<div class="value-card">
+					<p v-if="activeMapId === 3">Flowers planted: {{ flowersPlanted }} / {{ flowersTotal }}</p>
+					<p v-else-if="activeMapId === 4">Fences built: {{ fencesBuiltCount }} / {{ fencesTotal }}</p>
+					<p v-else-if="activeMapId === 5">Houses built: {{ housesBuiltCount }} / {{ housesTotal }} | {{ housesProgressDisplay }}</p>
+					<p v-else>Factory Progress: {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
+				</div>
+			</div>
 			<img :src="mapImage" :alt="mapObj.name" class="map-image" />
 			<div class="tiles-overlay" :style="gridStyle">
 				<Tile
@@ -159,6 +187,34 @@
 		     :style="{ transform: `translate(${playerX * mapObj.tileSize}px, ${(playerY * mapObj.tileSize) - 40}px)` }">
 				{{ chatBubbles[auth.user?.username || '']?.text }}
 			</div>
+
+			<!-- User card popup positioned near player -->
+			<div v-if="showUser" class="user-popup" :style="userPopupStyle">
+				<div class="user-card">
+					<div class="user-left">
+						<div class="user-sprite" v-html="userSpriteSvg"></div>
+						<div class="player-name">{{ auth.user?.username || 'Player' }}</div>
+							<button class="btn small" @click="closeUser">Close</button>
+
+							<!-- Color selector (player color customization) -->
+							<div class="color-selector">
+								<div v-for="c in colorOptions" :key="c" class="color-option" :class="{ selected: auth.user?.color === c }" :style="{ backgroundColor: colorMap[c] || c }" @click="selectColor(c)"></div>
+							</div>
+						</div>
+					<div class="user-right">
+						<h4>Inventory</h4>
+						<div class="inv-grid small">
+							<div v-for="slot in inventorySlots" :key="slot.key" class="inv-slot small" :title="slot.label + (slot.count != null ? (' x' + slot.count) : '')">
+								<div class="inv-inner">
+									<img v-if="slot.img" :src="slot.img" class="inv-img" :alt="slot.label" />
+									<span v-else class="inv-emoji">{{ slot.emoji || '◻' }}</span>
+									<span class="inv-count" v-if="slot.count != null">{{ slot.count }}</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 			<PlayerSprite
 				v-for="p in otherPlayers"
 				:key="p.sessionId"
@@ -216,9 +272,9 @@
 			<div v-if="gameFinished" class="endgame-overlay">
 				<h2>Monde Réanchanté! Bravo ! :)</h2>
 				<ul class="leaderboard">
-					<li>Most constructive: {{ leaderboard.mostConstructive || '—' }}</li>
+					<li>Joueur le plus constructif: {{ leaderboard.mostConstructive || '—' }}</li>
 					<li>Harvested the most: {{ leaderboard.mostHarvest || '—' }}</li>
-					<li>Most talkative: {{ leaderboard.mostTalkative || '—' }}</li>
+					<li>Pipelette de la partie: {{ leaderboard.mostTalkative || '—' }}</li>
 					<li>Did nothing: {{ leaderboard.didNothing || '—' }}</li>
 				</ul>
 			</div>
@@ -239,26 +295,54 @@
 				<div class="map-debug-row">message: {{ mapDebugMessage }}</div>
 			</div>
 		</div>
-			<!-- Chat input placed inside map wrapper (visual overlay) -->
-			<div class="hud">
-			<p>Position: ({{ playerX }}, {{ playerY }})</p>
+				<!-- Chat input placed inside map wrapper (visual overlay) -->
+				<!-- Inventory HUD (stone-themed) placed to the right of the map -->
+				<aside class="inventory-panel" aria-label="Inventory">
+					<h4 class="inv-title">Inventory</h4>
+					<div class="inv-grid">
+						<div v-for="slot in inventorySlots" :key="slot.key" class="inv-slot" :title="slot.label + (slot.count != null ? (' x' + slot.count) : '')">
+							<div class="inv-inner">
+								<img v-if="slot.img" :src="slot.img" class="inv-img" :alt="slot.label" />
+								<span v-else class="inv-emoji">{{ slot.emoji || '◻' }}</span>
+								<span class="inv-count" v-if="slot.count != null">{{ slot.count }}</span>
+							</div>
+						</div>
+					</div>
+				</aside>
+
+				<!-- Settings modal (stone-themed) -->
+				<div v-if="showSettings" class="settings-modal" role="dialog" aria-modal="true">
+					<div class="settings-card">
+						<h3>Settings</h3>
+						<div class="settings-row">
+							<label>Musique</label>
+							<div class="settings-controls">
+								<label><input type="radio" name="music" :value="true" v-model="musicEnabled" /> Oui</label>
+								<label><input type="radio" name="music" :value="false" v-model="musicEnabled" /> Non</label>
+							</div>
+							<!-- music placeholder (audio element moved to top-level so closing modal won't stop playback) -->
+						</div>
+						<div class="settings-row">
+							<label>Effets sonores</label>
+							<div class="settings-controls">
+								<label><input type="radio" name="sfx" :value="true" v-model="sfxEnabled" /> Oui</label>
+								<label><input type="radio" name="sfx" :value="false" v-model="sfxEnabled" /> Non</label>
+							</div>
+						</div>
+						<div class="settings-actions">
+							<button class="btn logout" @click="handleLogout">Se déconnecter</button>
+							<button class="btn" @click="closeSettings">Fermer</button>
+						</div>
+					</div>
+				</div>
+				<div class="hud">
+			<!-- <p>Position: ({{ playerX }}, {{ playerY }})</p> -->
 			<div v-if="bannerMessage" :class="['banner', bannerType]">{{ bannerMessage }}</div>
-			<p>
-				Bricks: {{ bricks }} | Rocks: {{ rocks }} | Wood: {{ wood }}
-				<span class="inventory">| Inventory: 
-					<img :src="wateringCanImg" alt="Watering Can" class="inv-icon"/> x{{ wateringCans }}
-					<img :src="shovelImg" alt="Shovel" class="inv-icon"/> x{{ shovels }}
-					<img v-if="fertilizers" :src="fertilizerImg" alt="Fertilizer" class="inv-icon"/> <span v-if="fertilizers">x{{ fertilizers }}</span>
-				</span>
-			</p>
+			<!-- Resource summary moved into inventory HUD on the right -->
 					<p v-if="activeMapId === 3">Flowers planted: {{ flowersPlanted }} / {{ flowersTotal }}</p>
 					<p v-else-if="activeMapId === 4">Fences built: {{ fencesBuiltCount }} / {{ fencesTotal }}</p>
 					<p v-else-if="activeMapId === 5">Houses built: {{ housesBuiltCount }} / {{ housesTotal }} | {{ housesProgressDisplay }}</p>
 					<p v-else>Factory Progress (shared - {{ mapObj.name || ('Map ' + activeMapId) }}): {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
-			<p class="controls">
-				Use arrow keys to move.
-				Click to interact with tiles, NPC, and other players.
-			</p>
 			<!-- hud chat-input removed from here; it is rendered inside the map wrapper for in-map placement -->
 		</div>
 
@@ -409,6 +493,7 @@
 </template>
 <script setup>
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../store/auth.store';
 import { useGameStore } from '../../store/game.store';
 import api from '../../services/api';
@@ -435,9 +520,14 @@ import house2Img from '../../assets/maps/house2.png';
 import house3Img from '../../assets/maps/house3.png';
 import Tile from './Tile.vue';
 import PlayerSprite from './PlayerSprite.vue';
+import bgTrack from '../../assets/music/bg.mp3';
+import hit1 from '../../assets/music/hit1.mp3';
+import hit2 from '../../assets/music/hit2.mp3';
+import hit3 from '../../assets/music/hit3.mp3';
 
 const auth = useAuthStore();
 const gameStore = useGameStore();
+const router = useRouter();
 
 const props = defineProps({
 	initialMapId: { type: Number, default: 1 }
@@ -898,6 +988,20 @@ function requestTrade() {
 
 // Incoming trade notifications
 const incomingTrade = ref(null); // { fromUsername }
+
+// Inventory slots for HUD (3x3)
+const inventorySlots = computed(() => {
+	const slots = [];
+	slots.push({ key: 'bricks', label: 'Bricks', count: bricks.value, emoji: '🧱' });
+	slots.push({ key: 'rocks', label: 'Rocks', count: rocks.value, emoji: '🪨' });
+	slots.push({ key: 'wood', label: 'Wood', count: wood.value, emoji: '🪵' });
+	slots.push({ key: 'watering', label: 'Watering Can', count: wateringCans.value, img: wateringCanImg });
+	slots.push({ key: 'shovel', label: 'Shovel', count: shovels.value, img: shovelImg });
+	slots.push({ key: 'fertilizer', label: 'Fertilizer', count: fertilizers.value, img: fertilizerImg });
+	// fill remaining slots with placeholders up to 9
+	while (slots.length < 9) slots.push({ key: 'empty-' + slots.length, label: 'Empty', count: null, emoji: '' });
+	return slots;
+});
 const tradePartner = ref(null);
 const showTradeForm = ref(false);
 const bricksToSend = ref(0);
@@ -1134,6 +1238,112 @@ function declineIncomingOffer() {
 // Chat state
 const chatInput = ref('');
 const chatBubbles = ref({}); // { username: { text } }
+
+// Sprite loader for user popup (reuse same Vite glob as PlayerSprite)
+const sprites = import.meta.glob('/src/assets/sprites/**/*.svg', { query: '?raw', import: 'default', eager: true });
+const userSpriteSvg = ref('');
+const userSpriteName = computed(() => 'front');
+const userSpritePath = computed(() => {
+	const folder = auth.user?.color || 'default';
+	return `/src/assets/sprites/${folder}/${userSpriteName.value}.svg`;
+});
+function loadUserSprite() {
+	const path = userSpritePath.value;
+	const fallbackPath = `/src/assets/sprites/default/${userSpriteName.value}.svg`;
+	const ultimateFallback = `/src/assets/sprites/default/front.svg`;
+	if (sprites[path]) userSpriteSvg.value = sprites[path];
+	else if (sprites[fallbackPath]) userSpriteSvg.value = sprites[fallbackPath];
+	else userSpriteSvg.value = sprites[ultimateFallback] || '';
+}
+onMounted(loadUserSprite);
+watch(() => auth.user?.color, loadUserSprite);
+
+// User popup state (position is captured once when opening so popup doesn't follow player)
+const showUser = ref(false);
+const userPopupOffset = { x: 0, y: 30 }; // px offset above player
+const userPopupPos = ref({ left: '0px', top: '0px' });
+const userPopupStyle = computed(() => ({
+	position: 'absolute',
+	left: userPopupPos.value.left,
+	top: userPopupPos.value.top,
+	transform: 'translate(-50%, -100%)',
+	zIndex: 130,
+}));
+
+function openUser() {
+	try {
+		const tile = mapObj.value.tileSize || 45;
+		const px = (playerX.value * tile) + Math.floor(tile / 2) + userPopupOffset.x;
+		const py = (playerY.value * tile) + userPopupOffset.y;
+		userPopupPos.value = { left: px + 'px', top: py + 'px' };
+	} catch (e) {
+		userPopupPos.value = { left: '50%', top: '50%' };
+	}
+	showUser.value = true;
+}
+function closeUser() { showUser.value = false; }
+
+// Color customization data + handler
+const colorOptions = ['blue','green','orange','pink','purple','red','turquoise','yellow'];
+const colorMap = {
+	blue: '#0b74d1',
+	green: '#3cb371',
+	orange: '#f39c12',
+	pink: '#ff69b4',
+	purple: '#8e44ad',
+	red: '#e74c3c',
+	turquoise: '#1abc9c',
+	yellow: '#f1c40f',
+};
+
+async function selectColor(c) {
+	try {
+		// optimistic local update
+		if (auth.user) {
+			auth.user = { ...auth.user, color: c };
+			try { localStorage.setItem('auth_user', JSON.stringify(auth.user)); } catch (e) {}
+		}
+		// persist to server via gameStore helper
+		try { await gameStore.updatePlayerColor(c); } catch (e) { console.warn('color save failed', e); }
+		// reload user sprite
+		try { loadUserSprite(); } catch (e) {}
+	} catch (err) {
+		console.error('Failed to select color', err);
+	}
+}
+
+// Settings modal state
+const showSettings = ref(false);
+const musicEnabled = ref(localStorage.getItem('musicEnabled') === 'false' ? false : true);
+const sfxEnabled = ref(localStorage.getItem('sfxEnabled') === 'false' ? false : true);
+const bgMusic = ref(null);
+const musicSrc = ref(''); // placeholder for future music file
+
+function openSettings() {
+	showSettings.value = true;
+}
+function closeSettings() {
+	showSettings.value = false;
+}
+
+function handleLogout() {
+	try { auth.logout(); } catch (e) { console.warn('logout failed', e); }
+	// redirect to auth route
+	router.push('/auth');
+}
+
+watch(musicEnabled, (v) => {
+	localStorage.setItem('musicEnabled', String(!!v));
+	// placeholder behavior: if enabling music and there's a src, try to play
+	if (v && bgMusic.value && musicSrc.value) {
+		try { bgMusic.value.play(); } catch (e) { /* noop */ }
+	} else if (bgMusic.value) {
+		try { bgMusic.value.pause(); bgMusic.value.currentTime = 0; } catch (e) { /* noop */ }
+	}
+});
+watch(sfxEnabled, (v) => {
+	localStorage.setItem('sfxEnabled', String(!!v));
+});
 const chatTimers = new Map();
 
 function showBubble(username, text) {
@@ -1255,7 +1465,29 @@ async function sendProgress({ deltaBricks = 0, deltaRocks = 0, deltaWorldScore =
 function doFactoryClick(x, y) {
 	activeFactory.value = { x, y };
 	// Local resource reward every 20 local clicks
+	const beforeClicks = factoryLocalClicks.value;
 	factoryLocalClicks.value += clickMultiplier.value;
+	const afterClicks = factoryLocalClicks.value;
+
+	// Play SFX when crossing every 5-click threshold. Alternate between three hits every 10 clicks.
+	if (sfxEnabled.value) {
+		try {
+			// prepare audio instances if not already
+			if (!window.__ree_sfx_pool) {
+				window.__ree_sfx_pool = [new Audio(hit1), new Audio(hit2), new Audio(hit3)];
+				window.__ree_sfx_pool.forEach(a => { a.preload = 'auto'; a.volume = 0.85; });
+			}
+			const pool = window.__ree_sfx_pool;
+			const beforeBucket = Math.floor(beforeClicks / 5);
+			const afterBucket = Math.floor(afterClicks / 5);
+			for (let b = beforeBucket + 1; b <= afterBucket; b++) {
+				const countAtThreshold = b * 5;
+				const idx = Math.floor(countAtThreshold / 10) % 3; // change every 10 clicks
+				const audio = pool[idx % pool.length];
+				try { audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {}
+			}
+		} catch (e) { console.warn('sfx play failed', e); }
+	}
 	if (factoryLocalClicks.value % 20 === 0) {
 		bricks.value += 1;
 		sendProgress({ deltaBricks: 1, deltaWorldScore: 1 });
@@ -1665,6 +1897,25 @@ onMounted(async () => {
 			console.error('Failed to send initial position', err);
 		}
 	}
+
+			// Wire background music if provided (user placed file at client/src/assets/music/bg.mp3)
+			try {
+				musicSrc.value = bgTrack;
+				// If enabled and element available, try to play (may be blocked until user gesture)
+				if (musicEnabled.value && bgMusic.value && musicSrc.value) {
+					try { bgMusic.value.load(); bgMusic.value.play().catch(() => {}); } catch (e) {}
+				}
+			} catch (e) {}
+
+			// Ensure we attempt playback on first user interaction as a fallback (autoplay often blocked)
+			const tryPlayOnce = () => {
+				if (musicEnabled.value && bgMusic.value && musicSrc.value) {
+					try { bgMusic.value.play().catch(() => {}); } catch (e) {}
+					// remove listener if still present
+					document.removeEventListener('pointerdown', tryPlayOnce);
+				}
+			};
+			document.addEventListener('pointerdown', tryPlayOnce, { passive: true });
 });
 
 onBeforeUnmount(() => {
@@ -1765,7 +2016,8 @@ async function tryTravelToMap5() {
 <style scoped>
 .game-map {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
+	gap: 12px;
 	align-items: flex-start;
 }
 
@@ -1774,6 +2026,7 @@ async function tryTravelToMap5() {
 	overflow: hidden;
 	border: 2px solid #333;
 	border-radius: 8px;
+	flex: 0 0 auto;
 }
 
 .map-image {
@@ -1867,46 +2120,99 @@ async function tryTravelToMap5() {
 }
 
 .chat-input {
-	display: flex;
-	gap: 6px;
-	align-items: center;
+	display: block;
 }
 
-/* In-map chat: bottom-centered pill bar */
+/* In-map chat: bottom-centered stone-themed bar using a 4-column grid.
+   Input spans 3 columns (3/4) and send button spans 1 column (1/4). */
 .chat-input.map-chat {
 	position: absolute;
 	bottom: 12px;
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: 60;
-	width: min(860px, calc(100% - 48px));
-	max-width: 860px;
-	padding: 6px 10px;
-	border-radius: 28px;
-	display: flex;
-	gap: 8px;
+	width: min(720px, calc(100% - 48px));
+	max-width: 720px;
+	padding: 6px;
+	border-radius: 16px;
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 6px;
 	align-items: center;
-	background: linear-gradient(180deg, #0b4f8a 0%, #0370c7 100%);
-	box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+	background: #514F62; /* stone-themed background */
+	border: 1px solid #000; /* outer stroke black */
+	box-shadow: 0 6px 12px rgba(0,0,0,0.35);
 }
 .chat-input.map-chat input[type='text'] {
-	flex: 1;
-	padding: 8px 12px;
-	border-radius: 18px;
-	border: none;
+	grid-column: 1 / span 3; /* spans 3 of 4 columns */
+	padding: 8px 10px;
+	border-radius: 12px;
+	border: 1.5px solid #2A9DF4; /* inner blue stroke */
 	outline: none;
 	background: rgba(255,255,255,0.98);
-	font-size: 14px;
+	font-size: 13px;
+	width: 100%;
 }
 .chat-input.map-chat button {
-	padding: 8px 12px;
-	border-radius: 14px;
-	border: none;
-	background: #fff;
-	color: #0370c7;
-	font-weight: 600;
+	grid-column: 4 / 5; /* takes the last 1/4 column */
+	padding: 8px 10px;
+	border-radius: 10px;
+	border: 1px solid rgba(255,255,255,0.12);
+	background: #2A9DF4; /* blue send button */
+	color: #fff;
+	font-weight: 700;
 	cursor: pointer;
+	font-size: 13px;
 }
+
+/* Settings modal (stone-themed) */
+.settings-modal {
+	position: absolute;
+	inset: 0; /* cover map wrapper */
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 120;
+	pointer-events: auto;
+}
+.settings-card {
+	width: min(360px, calc(100% - 48px));
+	background: #514F62;
+	border: 1px solid #000;
+	padding: 14px;
+	border-radius: 12px;
+	box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+	color: #fff;
+}
+.settings-card h3 { margin: 0 0 8px 0; font-size: 16px; }
+.settings-row { display:flex; justify-content:space-between; align-items:center; margin:8px 0; }
+.settings-controls label { margin-left:8px; font-size:14px; color:#f3f3f3; }
+.settings-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+.settings-card .btn.logout { background:#c0392b; border:1px solid rgba(0,0,0,0.2); color:#fff; font-weight:700; }
+
+/* User popup */
+.user-popup { pointer-events:auto; }
+.user-card { display:flex; gap:18px; align-items:flex-start; background:#514F62; border:1px solid #000; padding:14px; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,0.5); color:#fff; width: min(560px, calc(100% - 48px)); }
+.user-left { display:flex; flex-direction:column; gap:12px; align-items:flex-start; min-width:180px; }
+.player-name { font-weight:800; font-size:16px; background:rgba(255,255,255,0.06); padding:8px 12px; border-radius:10px; }
+.user-right h4 { margin:0 0 8px 0; font-size:16px; }
+.inv-grid.small { display:grid; grid-template-columns:repeat(3, 64px); gap:8px; }
+.inv-slot.small { width:64px; height:64px; border-radius:8px; }
+.inv-inner { display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
+.inv-img { max-width:48px; max-height:48px; image-rendering:pixelated; }
+.user-sprite { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }
+.user-sprite :deep(svg) { width:56px; height:56px; max-width:100%; max-height:100%; display:block; filter:drop-shadow(0 0 6px rgba(0,0,0,0.7)); }
+
+/* color selector styles (reuse existing app pattern) */
+.color-selector { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.color-option { width:28px; height:28px; border:2px solid transparent; cursor:pointer; border-radius:6px; }
+.color-option.selected { border-color:#000; box-shadow:0 2px 6px rgba(0,0,0,0.35); }
+
+/* Top-right value display */
+.top-right-values { position: absolute; top: 8px; right: 8px; z-index: 110; pointer-events: none; }
+.top-right-values .value-card { pointer-events: auto; background: #514F62; border: 1px solid #000; color: #fff; padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); font-size: 13px; }
+.top-right-values .value-card p { margin: 4px 0; }
+
 
 /* Map debug overlay */
 .map-debug {
@@ -1930,6 +2236,98 @@ async function tryTravelToMap5() {
 	font-size: 0.9rem;
 	color: #555;
 }
+
+/* Inventory panel styles */
+.game-map {
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+}
+.inventory-panel {
+	width: 260px;
+	/* background color requested */
+	background: #514F62;
+	/* outer stroke */
+	border: 3px solid #000000;
+	border-radius: 14px;
+	box-shadow: inset 0 8px 14px rgba(255,255,255,0.06), 0 8px 22px rgba(0,0,0,0.28);
+	padding: 12px;
+	z-index: 90;
+}
+.inv-title {
+	margin: 0 0 8px 0;
+	font-size: 14px;
+	text-align: center;
+	color: rgb(178, 204, 225);
+}
+.inv-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 10px;
+}
+.inv-slot {
+	width: 72px;
+	height: 72px;
+	border-radius: 8px;
+	/* outer stroke for each slot */
+	border: 2px solid #000000;
+	background: linear-gradient(180deg,#584f57,#463f48);
+	box-shadow: inset 0 -6px 8px rgba(0,0,0,0.24), 0 4px 10px rgba(0,0,0,0.28);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+}
+.inv-inner {
+	width: 56px;
+	height: 56px;
+	border-radius: 6px;
+	/* inner stroke (blue) */
+	border: 2px solid #1E90FF;
+	background: linear-gradient(180deg,#efeef3,#e6e2ea);
+	display:flex;align-items:center;justify-content:center;position:relative;
+}
+.inv-img { width:32px;height:32px; }
+.inv-emoji { font-size:22px; }
+.inv-count {
+	position: absolute;
+	right: -8px;
+	bottom: -8px;
+	background: rgba(0,0,0,0.85);
+	color: #fff;
+	font-size: 12px;
+	padding: 3px 7px;
+	border-radius: 12px;
+	box-shadow: 0 3px 6px rgba(0,0,0,0.5);
+}
+
+/* Top-left mini-buttons inside map */
+.map-top-left-buttons {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	display: flex;
+	flex-direction: row;
+	gap: 8px;
+	z-index: 120;
+}
+.ml-btn {
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 2px solid #000000; /* outer stroke black */
+	border-radius: 8px;
+	background: #514F62; /* panel background */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	box-shadow: 0 4px 8px rgba(0,0,0,0.35);
+}
+.ml-inner {
+	display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:2px solid #1E90FF; /* inner blue stroke */background: linear-gradient(180deg,#efeef3,#e6e2ea);font-size:18px;
+}
+.ml-btn:active { transform: translateY(1px); }
 
 .banner {
 	margin: 6px 0;
