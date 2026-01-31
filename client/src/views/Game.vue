@@ -1,7 +1,7 @@
 <template>
 	<section class="game-view">
 		<header class="game-header">
-			<h1>Reenchanter le Monde</h1>
+			<h1>Repair Loop</h1>
 			<div v-if="auth.user" class="player-info">
 				<span class="username">{{ auth.user.username }}</span>
 				<span class="role" v-if="auth.isAdmin">(admin)</span>
@@ -18,9 +18,10 @@
 
 			<section class="players" v-if="game.clients.length">
 				<h2>Joueurs connectés</h2>
-				<ul>
-					<li v-for="p in game.clients" :key="p.sessionId">
-						{{ p.username }}
+				<ul class="player-list">
+					<li v-for="p in game.clients" :key="p.sessionId" class="userlist">
+						<div class="player-list-sprite" v-html="getPlayerSprite(p)"></div>
+						<span class="player-list-name">{{ p.username }}</span>
 					</li>
 				</ul>
 			</section>
@@ -42,6 +43,16 @@ import { useAuthStore } from '../store/auth.store';
 import { useGameStore } from '../store/game.store';
 import GameMap from '../components/game/GameMap.vue';
 import api from '../services/api';
+// load raw SVG sprites so we can inline a small icon in the player list
+const sprites = import.meta.glob('/src/assets/sprites/**/*.svg', { query: '?raw', import: 'default', eager: true });
+
+function getPlayerSprite(p) {
+	const color = (p && p.color) ? p.color : 'default';
+	const path = `/src/assets/sprites/${color}/front.svg`;
+	if (sprites[path]) return sprites[path];
+	const fallback = `/src/assets/sprites/default/front.svg`;
+	return sprites[fallback] || '';
+}
 
 const auth = useAuthStore();
 const game = useGameStore();
@@ -108,68 +119,5 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.game-view {
-	padding: 20px;
-}
-
-.game-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 20px;
-}
-
-.player-info {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-}
-
-.robot-preview {
-	width: 24px;
-	height: 24px;
-	border: 1px solid #000;
-}
-
-.admin-link {
-	margin-left: 10px;
-	padding: 4px 8px;
-	border-radius: 6px;
-	background: #333;
-	color: #fff;
-	text-decoration: none;
-}
-
-.color-customization {
-  margin: 10px 0;
-}
-
-.color-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 5px;
-}
-
-.color-option {
-  width: 30px;
-  height: 30px;
-  border: 2px solid transparent;
-  cursor: pointer;
-}
-
-.color-option.selected {
-  border-color: #000;
-}
-
-
-.color-customization {
-	margin: 10px 0 0;
-	font-size: 0.9rem;
-}
-
-.color-customization input[type='color'] {
-	margin-left: 8px;
-	vertical-align: middle;
-}
+@import '../styles/game.css';
 </style>

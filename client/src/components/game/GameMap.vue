@@ -524,6 +524,8 @@ import bgTrack from '../../assets/music/bg.mp3';
 import hit1 from '../../assets/music/hit1.mp3';
 import hit2 from '../../assets/music/hit2.mp3';
 import hit3 from '../../assets/music/hit3.mp3';
+import plantSfx from '../../assets/music/plant.mp3';
+import rockSfx from '../../assets/music/rock.mp3';
 
 const auth = useAuthStore();
 const gameStore = useGameStore();
@@ -1097,6 +1099,18 @@ function registerRoomHandlers() {
 		if (cur >= (data.required || 50)) {
 			floweredSet.value.add(key);
 			spawnFlowerParticles(data.x, data.y);
+			// play planting sound if SFX enabled
+			if (typeof sfxEnabled !== 'undefined' && sfxEnabled.value) {
+				try {
+					if (!window.__ree_plant_audio) {
+						window.__ree_plant_audio = new Audio(plantSfx);
+						window.__ree_plant_audio.preload = 'auto';
+						window.__ree_plant_audio.volume = 0.9;
+					}
+					window.__ree_plant_audio.currentTime = 0;
+					window.__ree_plant_audio.play().catch(() => {});
+				} catch (e) { console.warn('plant sfx failed', e); }
+			}
 		}
 	});
 	gameStore.room.onMessage('tileFlowered', (data) => {
@@ -1104,6 +1118,18 @@ function registerRoomHandlers() {
 		const key = `${data.x},${data.y}`;
 		floweredSet.value.add(key);
 		spawnFlowerParticles(data.x, data.y);
+		// play planting sound if SFX enabled
+		if (typeof sfxEnabled !== 'undefined' && sfxEnabled.value) {
+			try {
+				if (!window.__ree_plant_audio) {
+					window.__ree_plant_audio = new Audio(plantSfx);
+					window.__ree_plant_audio.preload = 'auto';
+					window.__ree_plant_audio.volume = 0.9;
+				}
+				window.__ree_plant_audio.currentTime = 0;
+				window.__ree_plant_audio.play().catch(() => {});
+			} catch (e) { console.warn('plant sfx failed', e); }
+		}
 	});
 	// Fence building progress for Map 4
 	gameStore.room.onMessage('fenceBuilt', (data) => {
@@ -1272,7 +1298,7 @@ const userPopupStyle = computed(() => ({
 
 function openUser() {
 	try {
-		const tile = mapObj.value.tileSize || 45;
+		const tile = mapObj.value.tileSize || 50;
 		const px = (playerX.value * tile) + Math.floor(tile / 2) + userPopupOffset.x;
 		const py = (playerY.value * tile) + userPopupOffset.y;
 		userPopupPos.value = { left: px + 'px', top: py + 'px' };
@@ -1633,6 +1659,18 @@ function handleTileClick(tile) {
 		rocks.value += 1;
 		// Persist 1 rock gained and 1 point of world progress
 		sendProgress({ deltaRocks: 1, deltaWorldScore: 1 });
+		// play rock pickup SFX
+		if (typeof sfxEnabled !== 'undefined' && sfxEnabled.value) {
+			try {
+				if (!window.__ree_rock_audio) {
+					window.__ree_rock_audio = new Audio(rockSfx);
+					window.__ree_rock_audio.preload = 'auto';
+					window.__ree_rock_audio.volume = 0.9;
+				}
+				window.__ree_rock_audio.currentTime = 0;
+				window.__ree_rock_audio.play().catch(() => {});
+			} catch (e) { console.warn('rock sfx failed', e); }
+		}
 	}
 }
 
@@ -1751,6 +1789,18 @@ function interact() {
 	if (debrisSet.has(key) && !isDestroyed(playerX.value, playerY.value)) {
 		destroyedTiles.value.push({ x: playerX.value, y: playerY.value });
 		rocks.value += 1;
+		// play rock pickup SFX for interact
+		if (typeof sfxEnabled !== 'undefined' && sfxEnabled.value) {
+			try {
+				if (!window.__ree_rock_audio) {
+					window.__ree_rock_audio = new Audio(rockSfx);
+					window.__ree_rock_audio.preload = 'auto';
+					window.__ree_rock_audio.volume = 0.9;
+				}
+				window.__ree_rock_audio.currentTime = 0;
+				window.__ree_rock_audio.play().catch(() => {});
+			} catch (e) { console.warn('rock sfx failed', e); }
+		}
 	}
 }
 
