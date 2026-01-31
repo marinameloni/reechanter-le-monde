@@ -2,6 +2,14 @@
 	padding: 20px;
 }
 
+.game-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
 .game-header {
 	display: flex;
 	justify-content: space-between;
@@ -100,3 +108,21 @@
 }
 .player-list-name { font-weight: 600; margin-right: 6px; }
 .player-list-color { opacity: 0.7; font-size: 0.9rem; }
+
+
+.loader {
+	width: 10px;
+	aspect-ratio: 1;
+	border-radius: 50%;
+	display: inline-block;
+	vertical-align: middle;
+	margin-left: 6px;
+	animation: l5 1s infinite linear alternate;
+    margin-left: 15px;
+}
+@keyframes l5 {
+		0%  {box-shadow: 12px 0 #000, -12px 0 #0002; background: #000 }
+		33% {box-shadow: 12px 0 #000, -12px 0 #0002; background: #0002 }
+		66% {box-shadow: 12px 0 #0002, -12px 0 #000; background: #0002 }
+		100%{box-shadow: 12px 0 #0002, -12px 0 #000; background: #000 }
+}

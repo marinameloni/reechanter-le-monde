@@ -1,45 +1,78 @@
 <template>
-    <section>
-  <div class="auth-page">
-    <div class="login">
-      <h2>Login</h2>
-      <input v-model="loginForm.username" placeholder="Username" />
-      <input v-model="loginForm.password" type="password" placeholder="Password" />
-      <button @click="handleLogin">Login</button>
-      <p v-if="auth.error" class="error">{{ auth.error }}</p>
-    </div>
+  <section class="index-landing">
+    <header class="landing-header">
+      <ul>
+        <li><a href="/">Accueil</a></li>
+        <li><a href="#">Fonctionnalités</a></li>
+        <li><a href="#">À propos</a></li>
+        <li><a href="#">Contact</a></li>
+      </ul>
+    </header>
 
-    <div class="signup">
-      <h2>Sign Up</h2>
-      <input v-model="signupForm.username" placeholder="Username" />
-      <input v-model="signupForm.email" placeholder="Email" />
-      <input v-model="signupForm.password" type="password" placeholder="Password" />
+    <div class="game-container">
+      <div class="auth-content">
+        
+        <div class="player-card">
+          <div class="card-inner">
+            <div class="sprite-container">
+               <SignupSpritePreview v-if="previewUser" :color="previewUser.color" />
+               <div v-else class="robot-placeholder">
+                 <img :src="robotPlaceholder" alt="robot" class="robot-img" />
+               </div>
+            </div>
+            <h2 class="display-name">
+              {{ previewUser?.username || loginForm.username || 'ROBOT' }}
+            </h2>
+          </div>
+        </div>
 
-    <div class="character">
-      <SignupSpritePreview :color="signupForm.color" />
-      <p>Robot Color:</p>
-      <div class="color-selector">
-        <div
-          v-for="c in availableColors"
-          :key="c"
-          class="color-option"
-          :class="{ selected: signupForm.color === c }"
-          :style="{ backgroundColor: c }"
-          @click="signupForm.color = c"
-        ></div>
+        <div class="form-container">
+          <div class="form-area">
+            <label>Username:</label>
+            <input v-model="loginForm.username" placeholder="Username" class="cp-input" />
+            <label>Password:</label>
+            <input v-model="loginForm.password" type="password" class="cp-input" />
+            
+            <div class="checkbox-group">
+              <label><input type="checkbox"> Remember me on this computer</label>
+              <label><input type="checkbox"> Remember my password</label>
+            </div>
+
+            <button class="btn-cp-login" @click="handleLogin">Login</button>
+            
+            <div class="secondary-links">
+              <a href="#">Forgot your password?</a>
+              <a href="#">Forget my robot</a>
+            </div>
+          </div>
+
+          
+          <!-- signup moved to CreateRobot page -->
+          
+
+          <div class="sticky-note">
+            KEEP YOUR PASSWORD A SECRET
+          </div>
+        </div>
+      </div>
+
+      <div class="ui-footer">
+        <div class="logo-placeholder">
+          <img src="../assets/logo.png" alt="Logo" class="main-logo" />
+        </div>
+        <button class="switch-mode-btn" @click="router.push('/create')">
+          Create a Robot
+        </button>
       </div>
     </div>
-
-      <button @click="handleSignup">Sign Up</button>
-        <p v-if="auth.error" class="error">{{ auth.error }}</p>
-    </div>
-  </div>
   </section>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive, ref, watch, onBeforeUnmount } from 'vue';
 import SignupSpritePreview from '../components/game/SignupSpritePreview.vue';
+import robotPlaceholder from '../assets/sprites/default/front.svg';
+import api from '../services/api';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../store/auth.store';
 
@@ -60,84 +93,182 @@ const signupForm = reactive({
 
 const availableColors = ['blue', 'green', 'orange', 'pink', 'purple', 'red', 'turquoise', 'yellow'];
 
+const previewUser = ref(null);
+let lookupTimer = null;
+
+const lookupUsername = async (name) => {
+  previewUser.value = null;
+  if (!name || name.length < 2) return;
+  try {
+    const res = await api.get(`/player/username/${encodeURIComponent(name)}`);
+    // expect { success:true, player: { username, color, id_player }}
+    const player = res.data?.player || res.data?.user || null;
+    if (player) previewUser.value = { username: player.username, color: player.color };
+  } catch (err) {
+    // not found or no endpoint — silently ignore
+    previewUser.value = null;
+  }
+};
+
+// debounce watcher
+watch(() => loginForm.username, (val) => {
+  if (lookupTimer) clearTimeout(lookupTimer);
+  lookupTimer = setTimeout(() => lookupUsername(val.trim()), 300);
+});
+
+onBeforeUnmount(() => {
+  if (lookupTimer) clearTimeout(lookupTimer);
+});
+
 const handleLogin = async () => {
   await auth.login({ username: loginForm.username, password: loginForm.password });
   if (!auth.user) return;
-
-  // Redirection vers la partie après login réussi
   router.push('/game');
 };
 
 const handleSignup = async () => {
   await auth.signup(signupForm);
   if (!auth.user) return;
-
-  // Après inscription on enchaîne directement sur le jeu
   router.push('/game');
 };
+
+// signup is handled on separate CreateRobot page
 </script>
 
 <style scoped>
-.auth-page {
+.index-landing {
+  min-height: 100vh;
+  background-color: #0072bc;
   display: flex;
-  width: 90%;
-  max-width: 1000px;
-  margin: 50px auto;
-  gap: 40px;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
 }
 
-.login, .signup {
+.game-container {
+  width: 900px;
+  height: 550px;
+  position: relative;
+  border: 6px solid #005a96;
+  border-radius: 20px;
+  background: #39f;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-content {
+  display: flex;
   flex: 1;
-  padding: 20px;
-  border: 2px solid #333;
-  border-radius: 10px;
-  background: #f4f4f4;
+  padding: 40px;
+  gap: 40px;
+  align-items: center;
 }
 
-.character p {
-  margin: 10px 0 5px;
+/* Player Card Styles */
+.player-card {
+  flex: 1;
+  background: #fff;
+  padding: 5px;
+  border-radius: 18px;
+  height: 350px;
+  max-width: 280px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 
-.color-selector {
+.card-inner {
+  background: #005a96;
+  height: 100%;
+  border-radius: 14px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 15px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
 }
 
-.color-option {
-  width: 30px;
-  height: 30px;
-  border: 2px solid transparent;
-  cursor: pointer;
-}
-
-.color-option.selected {
-  border-color: #000;
-}
-
-input[type="text"], input[type="password"], input[type="email"], input[type="color"] {
-  display: block;
-  width: 100%;
-  margin-bottom: 15px;
-  padding: 8px;
-}
-
-button {
-  padding: 10px 15px;
-  cursor: pointer;
-  background-color: #4caf50;
+.display-name {
   color: white;
+  text-transform: uppercase;
+  font-style: italic;
+  font-size: 2rem;
+  margin: 0;
+  text-shadow: 2px 2px 0px rgba(0,0,0,0.3);
+}
+
+.robot-placeholder { width: 100px; height: 150px; background: rgba(255,255,255,0.1); border-radius: 20px; }
+
+.robot-img { width: 120px; height: auto; display: block; }
+
+.form-container { flex: 1; position: relative; color: white; }
+.form-area label { display: block; margin-bottom: 5px; font-weight: bold; }
+
+.cp-input {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #005a96;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.checkbox-group { font-size: 0.9rem; margin-bottom: 20px; }
+.checkbox-group label { font-weight: normal; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;}
+
+.btn-cp-login {
+  background: linear-gradient(#1e90ff, #0072bc);
+  border: 3px solid #00bfff;
+  border-radius: 50px;
+  color: white;
+  padding: 10px 40px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #005a96;
+}
+
+.btn-cp-login:active { transform: translateY(2px); box-shadow: 0 2px 0 #005a96; }
+
+.secondary-links { margin-top: 20px; display: flex; flex-direction: column; gap: 5px; }
+.secondary-links a { color: white; text-decoration: none; font-size: 0.9rem; }
+
+.sticky-note {
+  position: absolute;
+  bottom: -60px;
+  right: -20px;
+  background: #ffeb3b;
+  color: #333;
+  padding: 15px;
+  width: 140px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  transform: rotate(5deg);
+  box-shadow: 5px 5px 10px rgba(0,0,0,0.2);
+  text-align: center;
+  border-bottom-right-radius: 30px 5px;
+}
+
+.ui-footer { 
+  background: #0072bc; 
+  height: 80px; 
+  border-top: 6px solid #005a96; 
+  display: flex; 
+  justify-content: center; 
+  align-items: flex-end; 
+  padding-bottom: 10px;
+}
+
+.switch-mode-btn {
+  background: none;
   border: none;
-  border-radius: 5px;
+  color: white;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 1rem;
 }
 
-button:hover {
-  background-color: #45a049;
-}
+.color-selector { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.color-option { width: 20px; height: 20px; border-radius: 4px; cursor: pointer; border: 1px solid #fff; }
 
-.error {
-  color: red;
-  margin-top: 10px;
-}
+.landing-header { position: absolute; top: 20px; width: 100%; }
+.landing-header ul { display: flex; gap: 20px; justify-content: center; list-style: none; }
+.landing-header a { color: white; text-decoration: none; font-weight: bold; }
 </style>

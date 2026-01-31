@@ -1,7 +1,7 @@
 <template>
 	<section class="game-view">
 		<header class="game-header">
-			<h1>Repair Loop</h1>
+			<h1 class="game-title">Repair Loop</h1>
 			<div v-if="auth.user" class="player-info">
 				<span class="username">{{ auth.user.username }}</span>
 				<span class="role" v-if="auth.isAdmin">(admin)</span>
@@ -12,7 +12,7 @@
 
 		<main>
 			<p v-if="game.error" class="error">{{ game.error }}</p>
-			<p v-else-if="!game.connected">Connexion au serveur de jeu en cours...</p>
+			<p v-else-if="!game.connected">Connexion au serveur de jeu en cours <span class="loader" aria-hidden="true"></span></p>
 			<p v-else>Connecté au serveur temps réel (Colyseus).</p>
 
 
@@ -29,9 +29,6 @@
 			<!-- Placeholder pour la future carte 2D -->
 			<section class="map-section">
 				<GameMap v-if="isReady && startMapId != null" :initialMapId="startMapId" />
-				<pre class="debug-state">
-Tiles: {{ game.tiles.length }} | Ruins: {{ game.ruins.length }} | Buildings: {{ game.buildings.length }}
-				</pre>
 			</section>
 		</main>
 	</section>
@@ -120,4 +117,5 @@ onMounted(async () => {
 
 <style scoped>
 @import '../styles/game.css';
+
 </style>
