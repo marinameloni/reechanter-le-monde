@@ -58,11 +58,11 @@ onBeforeUnmount(() => { if (autoplay) clearInterval(autoplay); });
 
 <style>
 body {
-    background-color: #0072bc;
+    background-color: #243726;
 }
 .index-landing {
   min-height: 100vh;
-  background-color: #0072bc; 
+  background-color: #243726; 
   display: flex;
   justify-content: center;
   align-items: center;
@@ -76,10 +76,10 @@ body {
   max-width: 760px;
   max-height: calc(100vh - 12px);
   position: relative;
-  border: 6px solid #005a96; /* Darker blue frame */
+  border: 6px solid #5b4a33; /* Earthy brown frame */
   border-radius: 16px;
   overflow: hidden;
-  background: #39f;
+  background: #334a37;
   box-shadow: 0 12px 24px rgba(0,0,0,0.22);
 }
 
@@ -87,7 +87,7 @@ body {
 .screen-area {
   aspect-ratio: 4 / 3;
   position: relative;
-  background: #005a96;
+  background: #2f4a36;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -112,9 +112,9 @@ body {
 
 /* The Blue Bottom Bar */
 .ui-footer {
-  background: #0072bc;
+  background: #263622;
   height: 84px;
-  border-top: 5px solid #005a96;
+  border-top: 5px solid #5b4a33;
   position: relative;
   display: flex;
   justify-content: center;
@@ -128,9 +128,9 @@ body {
   top: -24px;
   left: 50%;
   transform: translateX(-50%);
-  background: #0072bc;
+  background: #263622;
   padding: 6px 16px;
-  border: 5px solid #005a96;
+  border: 5px solid #5b4a33;
   border-bottom: none;
   border-radius: 16px 16px 0 0;
   min-width: 150px;
@@ -153,15 +153,15 @@ body {
   font-style: italic;
   font-weight: bold;
   color: white;
-  border: 2px solid #003d66;
+  border: 2px solid #3e4a3e;
   border-radius: 10px;
   cursor: pointer;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
   transition: transform 0.1s;
 }
 
-.btn-create { background: linear-gradient(#1e90ff, #005a96); }
-.btn-login { background: linear-gradient(#1e90ff, #005a96); }
+.btn-create { background: linear-gradient(#7a8f6d, #2f4a36); }
+.btn-login { background: linear-gradient(#7a8f6d, #2f4a36); }
 
 .btn-create:hover, .btn-login:hover {
   transform: scale(1.02);
@@ -190,7 +190,7 @@ body {
 }
 
 .dots button.active {
-  background: #ffcc00; /* Classic CP Gold dot */
+  background: #b88646; /* Muted ochre */
   transform: scale(1.2);
 }
 

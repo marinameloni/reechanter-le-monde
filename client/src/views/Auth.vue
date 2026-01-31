@@ -136,9 +136,10 @@ const handleSignup = async () => {
 </script>
 
 <style scoped>
+
 .index-landing {
   min-height: 100vh;
-  background-color: #0072bc;
+  background-color: #243726;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -149,9 +150,9 @@ const handleSignup = async () => {
   width: 900px;
   height: 550px;
   position: relative;
-  border: 6px solid #005a96;
+  border: 6px solid #5b4a33;
   border-radius: 20px;
-  background: #39f;
+  background: #38523c;
   display: flex;
   flex-direction: column;
 }
@@ -176,7 +177,7 @@ const handleSignup = async () => {
 }
 
 .card-inner {
-  background: #005a96;
+  background: #2f4a36;
   height: 100%;
   border-radius: 14px;
   display: flex;
@@ -204,28 +205,30 @@ const handleSignup = async () => {
 .cp-input {
   width: 100%;
   padding: 10px;
-  border: 2px solid #005a96;
+  border: 2px solid #3e4a3e;
   border-radius: 4px;
   margin-bottom: 15px;
   font-size: 1.1rem;
+  background: rgba(255,255,255,0.02);
+  color: #fff;
 }
 
 .checkbox-group { font-size: 0.9rem; margin-bottom: 20px; }
 .checkbox-group label { font-weight: normal; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;}
 
 .btn-cp-login {
-  background: linear-gradient(#1e90ff, #0072bc);
-  border: 3px solid #00bfff;
+  background: linear-gradient(#7a8f6d, #2f4a36);
+  border: 3px solid #3e4a3e;
   border-radius: 50px;
   color: white;
   padding: 10px 40px;
   font-size: 1.4rem;
   font-weight: bold;
   cursor: pointer;
-  box-shadow: 0 4px 0 #005a96;
+  box-shadow: 0 4px 0 #5b4a33;
 }
 
-.btn-cp-login:active { transform: translateY(2px); box-shadow: 0 2px 0 #005a96; }
+.btn-cp-login:active { transform: translateY(2px); box-shadow: 0 2px 0 #5b4a33; }
 
 .secondary-links { margin-top: 20px; display: flex; flex-direction: column; gap: 5px; }
 .secondary-links a { color: white; text-decoration: none; font-size: 0.9rem; }
@@ -234,7 +237,7 @@ const handleSignup = async () => {
   position: absolute;
   bottom: -60px;
   right: -20px;
-  background: #ffeb3b;
+  background: #d6a94a;
   color: #333;
   padding: 15px;
   width: 140px;
@@ -247,9 +250,9 @@ const handleSignup = async () => {
 }
 
 .ui-footer { 
-  background: #0072bc; 
+  background: #263622; 
   height: 80px; 
-  border-top: 6px solid #005a96; 
+  border-top: 6px solid #5b4a33; 
   display: flex; 
   justify-content: center; 
   align-items: flex-end; 

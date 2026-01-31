@@ -118,4 +118,57 @@ onMounted(async () => {
 <style scoped>
 @import '../styles/game.css';
 
+/* Earthy page background */
+.game-view {
+	min-height: 100vh;
+	background-color: #243726;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 24px;
+}
+
+/* Header bar styled like other pages */
+.game-header {
+	width: 1030px;
+	max-width: 94%;
+	background: #2f4a36;
+	border: 6px solid #5b4a33;
+	border-radius: 16px;
+	color: white;
+	padding: 12px 20px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	box-shadow: 0 12px 24px rgba(0,0,0,0.22);
+	margin-bottom: 16px;
+}
+
+main {
+	min-width: 1030px;
+	width: 100%;
+	max-width: 1050px;
+	background: #334a37;
+	border: 6px solid #5b4a33;
+	border-radius: 16px;
+	padding: 20px;
+	color: white;
+	box-shadow: 0 12px 24px rgba(0,0,0,0.22);
+}
+
+.map-section {
+	margin-top: 12px;
+	background: #243726;
+	border: 2px solid #5b4a33;
+	border-radius: 12px;
+	padding: 12px;
+}
+
+.player-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.userlist { display:flex; align-items:center; gap:12px; padding:6px 8px; background: rgba(0,0,0,0.06); border-radius:8px; }
+.player-list-sprite svg { width: 36px; height: 36px; display: block; }
+.player-list-name { color: #fff; }
+
+.robot-preview { width: 20px; height: 20px; border-radius: 4px; border: 2px solid #3e4a3e; }
+
 </style>

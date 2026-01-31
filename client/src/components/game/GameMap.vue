@@ -295,20 +295,6 @@
 				<div class="map-debug-row">message: {{ mapDebugMessage }}</div>
 			</div>
 		</div>
-				<!-- Chat input placed inside map wrapper (visual overlay) -->
-				<!-- Inventory HUD (stone-themed) placed to the right of the map -->
-				<aside class="inventory-panel" aria-label="Inventory">
-					<h4 class="inv-title">Inventory</h4>
-					<div class="inv-grid">
-						<div v-for="slot in inventorySlots" :key="slot.key" class="inv-slot" :title="slot.label + (slot.count != null ? (' x' + slot.count) : '')">
-							<div class="inv-inner">
-								<img v-if="slot.img" :src="slot.img" class="inv-img" :alt="slot.label" />
-								<span v-else class="inv-emoji">{{ slot.emoji || '◻' }}</span>
-								<span class="inv-count" v-if="slot.count != null">{{ slot.count }}</span>
-							</div>
-						</div>
-					</div>
-				</aside>
 
 				<!-- Settings modal (stone-themed) -->
 				<div v-if="showSettings" class="settings-modal" role="dialog" aria-modal="true">
@@ -338,12 +324,7 @@
 				<div class="hud">
 			<!-- <p>Position: ({{ playerX }}, {{ playerY }})</p> -->
 			<div v-if="bannerMessage" :class="['banner', bannerType]">{{ bannerMessage }}</div>
-			<!-- Resource summary moved into inventory HUD on the right -->
-					<p v-if="activeMapId === 3">Flowers planted: {{ flowersPlanted }} / {{ flowersTotal }}</p>
-					<p v-else-if="activeMapId === 4">Fences built: {{ fencesBuiltCount }} / {{ fencesTotal }}</p>
-					<p v-else-if="activeMapId === 5">Houses built: {{ housesBuiltCount }} / {{ housesTotal }} | {{ housesProgressDisplay }}</p>
-					<p v-else>Factory Progress (shared - {{ mapObj.name || ('Map ' + activeMapId) }}): {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
-			<!-- hud chat-input removed from here; it is rendered inside the map wrapper for in-map placement -->
+			
 		</div>
 
 		<!-- Simple Exchange Modal -->
@@ -2197,7 +2178,7 @@ async function tryTravelToMap5() {
 	grid-column: 1 / span 3; /* spans 3 of 4 columns */
 	padding: 8px 10px;
 	border-radius: 12px;
-	border: 1.5px solid #2A9DF4; /* inner blue stroke */
+	border: 1.5px solid #5b4a33; /* inner earthy stroke */
 	outline: none;
 	background: rgba(255,255,255,0.98);
 	font-size: 13px;
@@ -2207,8 +2188,8 @@ async function tryTravelToMap5() {
 	grid-column: 4 / 5; /* takes the last 1/4 column */
 	padding: 8px 10px;
 	border-radius: 10px;
-	border: 1px solid rgba(255,255,255,0.12);
-	background: #2A9DF4; /* blue send button */
+	border: 1px solid rgba(0,0,0,0.12);
+	background: #d6a94a; /* earthy accent send button */
 	color: #fff;
 	font-weight: 700;
 	cursor: pointer;
@@ -2227,8 +2208,8 @@ async function tryTravelToMap5() {
 }
 .settings-card {
 	width: min(360px, calc(100% - 48px));
-	background: #514F62;
-	border: 1px solid #000;
+	background: #334a37;
+	border: 1px solid #5b4a33;
 	padding: 14px;
 	border-radius: 12px;
 	box-shadow: 0 8px 24px rgba(0,0,0,0.5);
@@ -2242,7 +2223,7 @@ async function tryTravelToMap5() {
 
 /* User popup */
 .user-popup { pointer-events:auto; }
-.user-card { display:flex; gap:18px; align-items:flex-start; background:#514F62; border:1px solid #000; padding:14px; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,0.5); color:#fff; width: min(560px, calc(100% - 48px)); }
+.user-card { display:flex; gap:18px; align-items:flex-start; background:#334a37; border:1px solid #5b4a33; padding:14px; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,0.5); color:#fff; width: min(560px, calc(100% - 48px)); }
 .user-left { display:flex; flex-direction:column; gap:12px; align-items:flex-start; min-width:180px; }
 .player-name { font-weight:800; font-size:16px; background:rgba(255,255,255,0.06); padding:8px 12px; border-radius:10px; }
 .user-right h4 { margin:0 0 8px 0; font-size:16px; }
@@ -2260,7 +2241,7 @@ async function tryTravelToMap5() {
 
 /* Top-right value display */
 .top-right-values { position: absolute; top: 8px; right: 8px; z-index: 110; pointer-events: none; }
-.top-right-values .value-card { pointer-events: auto; background: #514F62; border: 1px solid #000; color: #fff; padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); font-size: 13px; }
+.top-right-values .value-card { pointer-events: auto; background: #334a37; border: 1px solid #5b4a33; color: #fff; padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); font-size: 13px; }
 .top-right-values .value-card p { margin: 4px 0; }
 
 
@@ -2332,8 +2313,8 @@ async function tryTravelToMap5() {
 	width: 56px;
 	height: 56px;
 	border-radius: 6px;
-	/* inner stroke (blue) */
-	border: 2px solid #1E90FF;
+	/* inner stroke (earthy) */
+	border: 2px solid #5b4a33;
 	background: linear-gradient(180deg,#efeef3,#e6e2ea);
 	display:flex;align-items:center;justify-content:center;position:relative;
 }
@@ -2367,7 +2348,7 @@ async function tryTravelToMap5() {
 	padding: 0;
 	border: 2px solid #000000; /* outer stroke black */
 	border-radius: 8px;
-	background: #514F62; /* panel background */
+	background: #334a37; /* panel background */
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -2375,7 +2356,7 @@ async function tryTravelToMap5() {
 	box-shadow: 0 4px 8px rgba(0,0,0,0.35);
 }
 .ml-inner {
-	display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:2px solid #1E90FF; /* inner blue stroke */background: linear-gradient(180deg,#efeef3,#e6e2ea);font-size:18px;
+	display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:2px solid #5b4a33; /* inner earthy stroke */background: linear-gradient(180deg,#efeef3,#e6e2ea);font-size:18px;
 }
 .ml-btn:active { transform: translateY(1px); }
 
@@ -2489,11 +2470,13 @@ async function tryTravelToMap5() {
 	z-index: 100;
 }
 .exchange-card {
-	background: #fff;
+	background: #334a37;
+	color: #fff;
 	padding: 16px;
 	border-radius: 8px;
 	width: 280px;
-	box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+	box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+	border: 1px solid #5b4a33;
 }
 .exchange-card.wide {
 	width: 560px;
@@ -2504,7 +2487,7 @@ async function tryTravelToMap5() {
 	gap: 12px;
 }
 .panel {
-	border: 1px solid #ddd;
+	border: 1px solid #5b4a33;
 	border-radius: 6px;
 	padding: 8px;
 }
@@ -2512,8 +2495,9 @@ async function tryTravelToMap5() {
 	display: inline-block;
 	padding: 2px 6px;
 	margin-right: 6px;
-	background: #eee;
+	background: #3e4a3e;
 	border-radius: 6px;
+	color: #e6e6d8;
 	font-size: 12px;
 }
 .exchange-card h3 {
@@ -2536,16 +2520,17 @@ async function tryTravelToMap5() {
 	margin: 6px 0;
 	padding: 8px;
 	border: none;
-	background: #4caf50;
+	background: #d6a94a;
 	color: #fff;
 	cursor: pointer;
 	border-radius: 6px;
+	font-weight: 700;
 }
 .btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
 .btn.close {
-	background: #999;
+	background: #5b4a33;
 }
 </style>
