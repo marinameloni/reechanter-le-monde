@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import api from '../services/api';
 import { Client } from 'colyseus.js';
+import { useAuthStore } from './auth.store';
 
 export const useGameStore = defineStore('game', {
     state: () => ({
@@ -175,7 +176,14 @@ export const useGameStore = defineStore('game', {
 
         async updatePlayerColor(color) {
             try {
+                const auth = useAuthStore();
+                const playerId = auth.user?.id || auth.user?.id_player;
+                if (!playerId) {
+                    console.error('No playerId available to update color');
+                    return;
+                }
                 await api.post('/api/player/color', {
+                    playerId,
                     color,
                 });
             } catch (err) {
