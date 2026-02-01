@@ -1,13 +1,6 @@
 <template>
   <section class="index-landing">
-    <header class="landing-header">
-      <ul>
-        <li><a href="/">Accueil</a></li>
-        <li><a href="#">Fonctionnalités</a></li>
-        <li><a href="#">À propos</a></li>
-        <li><a href="#">Contact</a></li>
-      </ul>
-    </header>
+    <Header />
 
     <div class="game-container">
       <div class="auth-content">
@@ -58,6 +51,7 @@
 
 <script setup>
 import { reactive, ref, watch, onMounted } from 'vue';
+import Header from '../components/ui/Header.vue';
 import SignupSpritePreview from '../components/game/SignupSpritePreview.vue';
 import frontDefault from '../assets/sprites/default/front.svg?raw';
 import { useRouter } from 'vue-router';

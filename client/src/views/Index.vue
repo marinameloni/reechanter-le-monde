@@ -1,13 +1,6 @@
 <template>
   <section class="index-landing">
-    <header class="landing-header">
-        <ul style="list-style: none; display: flex; gap: 20px; justify-content: center; padding: 0; margin: 0; ">
-            <li><a href="/">Accueil</a></li>
-            <li><a href="#features">Fonctionnalités</a></li>
-            <li><a href="#about">À propos</a></li>
-            <li><a href="#contact">Contact</a></li>
-        </ul>
-    </header>
+    <Header />
     <div class="game-container">
       <div class="screen-area">
         <div class="slide">
@@ -36,6 +29,7 @@
 </template>
 
 <script setup>
+import Header from '../components/ui/Header.vue';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import screen1 from '../assets/screen1.jpg';

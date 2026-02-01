@@ -1,14 +1,6 @@
 <template>
 	<section class="game-view">
-		<header class="game-header">
-			<h1 class="game-title">Repair Loop</h1>
-			<div v-if="auth.user" class="player-info">
-				<span class="username">{{ auth.user.username }}</span>
-				<span class="role" v-if="auth.isAdmin">(admin)</span>
-				<div class="robot-preview" :style="{ backgroundColor: localColor }"></div>
-				<router-link v-if="auth.isAdmin" to="/admin" class="admin-link">Admin</router-link>
-			</div>
-		</header>
+		<Header />
 
 		<main>
 			<p v-if="game.error" class="error">{{ game.error }}</p>
@@ -36,6 +28,7 @@
 
 <script setup>
 import { onMounted, ref, watch } from 'vue';
+import Header from '../components/ui/Header.vue';
 import { useAuthStore } from '../store/auth.store';
 import { useGameStore } from '../store/game.store';
 import GameMap from '../components/game/GameMap.vue';

@@ -507,6 +507,7 @@ import hit2 from '../../assets/music/hit2.mp3';
 import hit3 from '../../assets/music/hit3.mp3';
 import plantSfx from '../../assets/music/plant.mp3';
 import rockSfx from '../../assets/music/rock.mp3';
+import chatSfx from '../../assets/music/chatsound.mp3';
 
 const auth = useAuthStore();
 const gameStore = useGameStore();
@@ -1049,6 +1050,18 @@ function registerRoomHandlers() {
 	gameStore.room.onMessage('chatMessage', (data) => {
 		if (!data || !data.fromUsername || !data.text) return;
 		showBubble(data.fromUsername, data.text);
+		// play chat sfx on incoming message if SFX enabled
+		if (typeof sfxEnabled !== 'undefined' && sfxEnabled.value) {
+			try {
+				if (!window.__ree_chat_audio) {
+					window.__ree_chat_audio = new Audio(chatSfx);
+					window.__ree_chat_audio.preload = 'auto';
+					window.__ree_chat_audio.volume = 0.9;
+				}
+				window.__ree_chat_audio.currentTime = 0;
+				window.__ree_chat_audio.play().catch(() => {});
+			} catch (e) { console.warn('chat sfx failed', e); }
+		}
 	});
 	gameStore.room.onMessage('factoryProgress', (data) => {
 		if (!data || typeof data.mapId !== 'number') return;
@@ -1375,6 +1388,18 @@ function sendChat() {
 	try {
 		gameStore.room.send('chatMessage', { text });
 		chatInput.value = '';
+		// play local chat sfx when sending our own message (respect SFX toggle)
+		if (typeof sfxEnabled !== 'undefined' && sfxEnabled.value) {
+			try {
+				if (!window.__ree_chat_audio) {
+					window.__ree_chat_audio = new Audio(chatSfx);
+					window.__ree_chat_audio.preload = 'auto';
+					window.__ree_chat_audio.volume = 0.9;
+				}
+				window.__ree_chat_audio.currentTime = 0;
+				window.__ree_chat_audio.play().catch(() => {});
+			} catch (e) { console.warn('chat sfx failed', e); }
+		}
 	} catch (err) {
 		console.error('Failed to send chat', err);
 	}

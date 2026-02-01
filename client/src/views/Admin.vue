@@ -1,5 +1,6 @@
 <template>
 	<div class="admin-view">
+		<Header />
 		<h2>Admin Panel</h2>
 		<p>This action resets progress for all players.</p>
 		<button class="btn" @click="resetAll" :disabled="loading">
@@ -44,6 +45,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import Header from '../components/ui/Header.vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api.js';
 import { useAuthStore } from '../store/auth.store.js';
