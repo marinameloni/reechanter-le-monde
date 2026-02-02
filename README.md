@@ -58,12 +58,6 @@ Notes:
 - On startup, the store decodes `exp` and clears auth if expired; otherwise the user stays logged in until explicit logout or 24h passes.
 - All Axios calls include the `Authorization: Bearer <token>` header via a request interceptor.
 
-Admin account for development:
-
-- Username: `admin`
-- Password: `clubpenguin123`
-- The account is created automatically on first login if missing. Do not use in production.
-
 ## Key Files
 
 - Client
