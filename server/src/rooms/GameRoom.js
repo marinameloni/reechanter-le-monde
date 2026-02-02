@@ -269,9 +269,12 @@ export class GameRoom extends Room {
       try { client.send('factoryClickQueued', { inc: toAdd }); } catch {}
     });
 
-    // Shared watering per tile on Map 3 (former factory tiles)
-    this.onMessage("waterTile", async (client, data) => {
-      const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
+    // Shared watering per tile on Map 3 (buffered to reduce DB writes)
+    this.pendingFlowerClicks = new Map(); // sessionId -> Map('x,y' -> count)
+    this.flowerPerIntervalCap = 100; // max clicks per player per flush interval
+
+    this.onMessage("waterTile", (client, data) => {
+      const inc = (data && typeof data.inc === 'number') ? Math.max(0, Math.floor(data.inc)) : 1;
       const mapId = this.mapId ?? 3;
       const x = (data && typeof data.x === 'number') ? data.x : null;
       const y = (data && typeof data.y === 'number') ? data.y : null;
@@ -282,43 +285,79 @@ export class GameRoom extends Room {
         try { client.send('actionDenied', { action: 'water', reason: 'out_of_range' }); } catch {}
         return;
       }
-      // enforce cooldown per player for watering to avoid spam
-      if (!this._canPerform(sid, 'water', 800)) {
-        try { client.send('actionDenied', { action: 'water', reason: 'cooldown' }); } catch {}
+      // per-interval cap enforcement
+      const playerMap = this.pendingFlowerClicks.get(sid) || new Map();
+      const prevTotal = Array.from(playerMap.values()).reduce((a, b) => a + b, 0);
+      const allowed = Math.max(0, this.flowerPerIntervalCap - prevTotal);
+      const toAdd = Math.min(inc, allowed);
+      if (toAdd <= 0) {
+        try { client.send('flowerClickDenied', { reason: 'rate_limited' }); } catch {}
+        return;
+      }
+      const key = `${x},${y}`;
+      playerMap.set(key, (playerMap.get(key) || 0) + toAdd);
+      this.pendingFlowerClicks.set(sid, playerMap);
+      try { client.send('flowerClickQueued', { x, y, inc: toAdd }); } catch {}
+    });
+
+    // Flush pending flower clicks every 500ms
+    this._flowerFlushInterval = setInterval(async () => {
+      if (!this.pendingFlowerClicks || this.pendingFlowerClicks.size === 0) return;
+      // Aggregate per-tile totals across players
+      const tileTotals = new Map(); // 'x,y' -> total clicks
+      for (const [, map] of this.pendingFlowerClicks.entries()) {
+        for (const [k, v] of map.entries()) {
+          tileTotals.set(k, (tileTotals.get(k) || 0) + v);
+        }
+      }
+      if (tileTotals.size === 0) {
+        this.pendingFlowerClicks.clear();
         return;
       }
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');
-        const row = await db.get('SELECT water_current, water_required FROM flower_progress WHERE id_map = ? AND tile_x = ? AND tile_y = ?;', [mapId, x, y]);
-        if (!row) {
-          // initialize if not existing
-          await db.run('INSERT INTO flower_progress (id_map, tile_x, tile_y, water_current, water_required) VALUES (?, ?, ?, 0, 50);', [mapId, x, y]);
-        }
-        await db.run(
-          `UPDATE flower_progress
-           SET water_current = MIN(water_required, water_current + ?), updated_at = CURRENT_TIMESTAMP
-           WHERE id_map = ? AND tile_x = ? AND tile_y = ?;`,
-          [inc, mapId, x, y]
-        );
-        const updated = await db.get('SELECT water_current, water_required FROM flower_progress WHERE id_map = ? AND tile_x = ? AND tile_y = ?;', [mapId, x, y]);
-        await db.exec('COMMIT;');
-
-        // Broadcast updated tile progress to all
-        this.broadcast('flowerProgress', { mapId, x, y, current: updated.water_current || 0, required: updated.water_required || 50 });
-        // If tile completed, broadcast tileFlowered
-        if ((updated.water_current || 0) >= (updated.water_required || 50)) {
-          this.broadcast('tileFlowered', { mapId, x, y });
-          // Check if all tiles on map 3 completed
-          const remaining = await db.get('SELECT COUNT(*) as c FROM flower_progress WHERE id_map = 3 AND water_current < water_required;');
-          if ((remaining?.c || 0) === 0) {
-            this.broadcast('mapUnlocked', { mapId: 4 });
+        for (const [k, total] of tileTotals.entries()) {
+          const [sx, sy] = k.split(',').map(Number);
+          const row = await db.get('SELECT water_current, water_required FROM flower_progress WHERE id_map = ? AND tile_x = ? AND tile_y = ?;', [3, sx, sy]);
+          if (!row) {
+            await db.run('INSERT INTO flower_progress (id_map, tile_x, tile_y, water_current, water_required) VALUES (?, ?, ?, 0, 50);', [3, sx, sy]);
+          }
+          await db.run(
+            `UPDATE flower_progress SET water_current = MIN(water_required, water_current + ?) , updated_at = CURRENT_TIMESTAMP WHERE id_map = ? AND tile_x = ? AND tile_y = ?;`,
+            [total, 3, sx, sy]
+          );
+          const updated = await db.get('SELECT water_current, water_required FROM flower_progress WHERE id_map = ? AND tile_x = ? AND tile_y = ?;', [3, sx, sy]);
+          this.broadcast('flowerProgress', { mapId: 3, x: sx, y: sy, current: updated.water_current || 0, required: updated.water_required || 50 });
+          if ((updated.water_current || 0) >= (updated.water_required || 50)) {
+            this.broadcast('tileFlowered', { mapId: 3, x: sx, y: sy });
           }
         }
+        // Check overall completion
+        const remaining = await db.get('SELECT COUNT(*) as c FROM flower_progress WHERE id_map = 3 AND water_current < water_required;');
+        if ((remaining?.c || 0) === 0) {
+          this.broadcast('mapUnlocked', { mapId: 4 });
+        }
+        await db.exec('COMMIT;');
+
+        // send per-player flush acks
+        for (const [sid, map] of this.pendingFlowerClicks.entries()) {
+          try {
+            const clientObj = [...this.clientByUsername.entries()].find(([, cl]) => cl.sessionId === sid);
+            if (clientObj) {
+              const cl = clientObj[1];
+              const contributed = Array.from(map.values()).reduce((a, b) => a + b, 0);
+              try { cl.send('flowerClickFlushed', { inc: contributed }); } catch {}
+            }
+          } catch {}
+        }
       } catch (err) {
-        console.error('Failed to update flower progress', err);
+        console.error('Failed to flush flower clicks', err);
+        try { const db2 = await openDB(); await db2.exec('ROLLBACK;'); } catch {}
+      } finally {
+        this.pendingFlowerClicks.clear();
       }
-    });
+    }, 500);
 
     // Shared fence building on Map 4
     this.onMessage("buildFence", async (client, data) => {
@@ -368,85 +407,118 @@ export class GameRoom extends Room {
       }
     });
 
-    // Shared house building on Map 5: each contribution spends 1 rock and adds 1 progress; 50 required per house
-    this.onMessage("buildHouse", async (client, data) => {
+    // Buffered house contributions to batch DB writes and avoid aggressive cooldowns
+    this.pendingHouseContribs = new Map(); // sessionId -> Map('x,y' -> count)
+    this.housePerIntervalCap = 20; // max contributions per player per flush interval
+    const validHouseSites = new Set(['14,13','8,7','28,7']);
+
+    this.onMessage("buildHouse", (client, data) => {
       const x = (data && typeof data.x === 'number') ? data.x : null;
       const y = (data && typeof data.y === 'number') ? data.y : null;
       const mapId = this.mapId ?? 5;
       if (x == null || y == null) return;
-      if (mapId !== 5) return; // only valid in Map 5 room
-      // proximity check: must be near site
-      if (!this._isInRange(client.sessionId, x, y, 2)) {
+      if (mapId !== 5) return;
+      // proximity check
+      const sid = client.sessionId;
+      if (!this._isInRange(sid, x, y, 2)) {
         try { client.send('actionDenied', { action: 'house', reason: 'out_of_range' }); } catch {}
         return;
       }
-      // throttle house build contributions per player
-      const sid = client.sessionId;
-      if (!this._canPerform(sid, 'house', 1200)) {
-        try { client.send('actionDenied', { action: 'house', reason: 'cooldown' }); } catch {}
+      const key = `${x},${y}`;
+      if (!validHouseSites.has(key)) return;
+      // per-interval cap enforcement per player across all sites
+      const playerMap = this.pendingHouseContribs.get(sid) || new Map();
+      const prevTotal = Array.from(playerMap.values()).reduce((a, b) => a + b, 0);
+      const allowed = Math.max(0, this.housePerIntervalCap - prevTotal);
+      const toAdd = Math.min(1, allowed); // each click contributes 1 rock
+      if (toAdd <= 0) {
+        try { client.send('houseContribDenied', { reason: 'rate_limited' }); } catch {}
         return;
       }
-      const validSites = new Set(['14,13','8,7','28,7']);
-      const key = `${x},${y}`;
-      if (!validSites.has(key)) return;
+      playerMap.set(key, (playerMap.get(key) || 0) + toAdd);
+      this.pendingHouseContribs.set(sid, playerMap);
+      try { client.send('houseContribQueued', { x, y, inc: toAdd }); } catch {}
+    });
+
+    // Flush pending house contributions every 1s
+    this._houseFlushInterval = setInterval(async () => {
+      if (!this.pendingHouseContribs || this.pendingHouseContribs.size === 0) return;
+      // Aggregate per-site totals while respecting each player's available rocks
+      const siteTotals = new Map(); // 'x,y' -> total contributions
+      const perPlayerProcessed = new Map(); // sid -> processed total
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');
-        // Ensure progress row exists
-        const row = await db.get('SELECT progress, required FROM house_progress WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [x, y]);
-        if (!row) {
-          await db.run('INSERT INTO house_progress (id_map, tile_x, tile_y, progress, required) VALUES (5, ?, ?, 0, 50);', [x, y]);
-        }
 
-        // Find contributing player and check rocks
-        const me = this.state.clients.find(c => c.sessionId === client.sessionId);
-        const idPlayer = me && me.id_player;
-        if (!idPlayer) { await db.exec('ROLLBACK;'); return; }
-        const inv = await db.get('SELECT rocks FROM inventory WHERE id_player = ?;', [idPlayer]);
-        if (!inv) {
-          // initialize inventory if missing
-          await db.run('INSERT INTO inventory (id_player, bricks, rocks) VALUES (?, 0, 0);', [idPlayer]);
-        }
-        const curInv = inv || { rocks: 0 };
-        if ((curInv.rocks || 0) <= 0) {
-          await db.exec('ROLLBACK;');
-          // notify only this client insufficient resources
-          client.send('houseError', { x, y, reason: 'insufficient_rocks' });
-          return;
-        }
-
-        // Spend 1 rock and add progress (capped at required)
-        await db.run('UPDATE inventory SET rocks = rocks - 1 WHERE id_player = ? AND rocks > 0;', [idPlayer]);
-        await db.run('UPDATE house_progress SET progress = MIN(required, progress + 1) WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [x, y]);
-        const updated = await db.get('SELECT progress, required FROM house_progress WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [x, y]);
-        const newInv = await db.get('SELECT bricks, rocks FROM inventory WHERE id_player = ?;', [idPlayer]);
-        await db.exec('COMMIT;');
-
-        // Update contributing player's inventory
-        try { client.send('inventoryUpdate', { bricks: newInv?.bricks || 0, rocks: newInv?.rocks || 0 }); } catch {}
-
-        // Track constructive contribution for leaderboard
-        try {
-          const statsExists = await openDB().then(d => d.get('SELECT 1 FROM player_stats WHERE id_player = ?;', [idPlayer]));
-          const db2 = await openDB();
-          await db2.exec('BEGIN TRANSACTION;');
-          if (!statsExists) {
-            await db2.run('INSERT INTO player_stats (id_player, constructive, harvest) VALUES (?, 0, 0);', [idPlayer]);
+        // For each player, consume rocks up to their requested contributions
+        for (const [sid, map] of this.pendingHouseContribs.entries()) {
+          const clientEntry = [...this.clientByUsername.entries()].find(([, cl]) => cl.sessionId === sid);
+          const cl = clientEntry ? clientEntry[1] : null;
+          const me = this.state.clients.find(c => c.sessionId === sid);
+          const idPlayer = me && me.id_player;
+          if (!idPlayer) continue;
+          // ensure inventory row exists
+          const invRow = await db.get('SELECT rocks FROM inventory WHERE id_player = ?;', [idPlayer]);
+          if (!invRow) {
+            await db.run('INSERT INTO inventory (id_player, bricks, rocks) VALUES (?, 0, 0);', [idPlayer]);
           }
-          await db2.run('UPDATE player_stats SET constructive = constructive + 1 WHERE id_player = ?;', [idPlayer]);
-          await db2.exec('COMMIT;');
-        } catch {}
-
-        // Broadcast progress to all
-        this.broadcast('houseProgress', { mapId: 5, x, y, current: updated.progress || 0, required: updated.required || 50 });
-        if ((updated.progress || 0) >= (updated.required || 50)) {
-          this.broadcast('houseBuilt', { mapId: 5, x, y });
+          let available = (invRow && typeof invRow.rocks === 'number') ? invRow.rocks : 0;
+          let processedForPlayer = 0;
+          for (const [k, req] of map.entries()) {
+            if (available <= 0) break;
+            const take = Math.min(req, available);
+            if (take <= 0) continue;
+            siteTotals.set(k, (siteTotals.get(k) || 0) + take);
+            available -= take;
+            processedForPlayer += take;
+          }
+          if (processedForPlayer > 0) {
+            // decrement player's rocks
+            await db.run('UPDATE inventory SET rocks = rocks - ? WHERE id_player = ? AND rocks >= ?;', [processedForPlayer, idPlayer, processedForPlayer]);
+            perPlayerProcessed.set(sid, processedForPlayer);
+          }
         }
-        // Broadcast full house progress snapshot to keep all clients in sync
+
+        // Apply site totals to house_progress
+        for (const [k, total] of siteTotals.entries()) {
+          const [sx, sy] = k.split(',').map(Number);
+          const row = await db.get('SELECT progress, required FROM house_progress WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [sx, sy]);
+          if (!row) {
+            await db.run('INSERT INTO house_progress (id_map, tile_x, tile_y, progress, required) VALUES (5, ?, ?, 0, 50);', [sx, sy]);
+          }
+          await db.run('UPDATE house_progress SET progress = MIN(required, progress + ?) WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [total, sx, sy]);
+          const updated = await db.get('SELECT progress, required FROM house_progress WHERE id_map = 5 AND tile_x = ? AND tile_y = ?;', [sx, sy]);
+          this.broadcast('houseProgress', { mapId: 5, x: sx, y: sy, current: updated.progress || 0, required: updated.required || 50 });
+          if ((updated.progress || 0) >= (updated.required || 50)) {
+            this.broadcast('houseBuilt', { mapId: 5, x: sx, y: sy });
+          }
+        }
+
+        // Broadcast full house progress snapshot
         try {
           const allRows = await db.all('SELECT id_map, tile_x, tile_y, progress, required FROM house_progress WHERE id_map = 5;');
           this.broadcast('houseAllProgress', { mapId: 5, rows: (allRows || []).map(r => ({ x: r.tile_x, y: r.tile_y, current: r.progress || 0, required: r.required || 50 })) });
-          // If all houses completed, announce gameFinished with leaderboard
+        } catch (e) {}
+
+        await db.exec('COMMIT;');
+
+        // Notify players about inventory updates and processed amounts
+        for (const [sid, processed] of perPlayerProcessed.entries()) {
+          try {
+            const clientEntry = [...this.clientByUsername.entries()].find(([, cl]) => cl.sessionId === sid);
+            if (!clientEntry) continue;
+            const cl = clientEntry[1];
+            const me = this.state.clients.find(c => c.sessionId === sid);
+            const idPlayer = me && me.id_player;
+            if (!idPlayer) continue;
+            const newInv = await openDB().then(db2 => db2.get('SELECT bricks, rocks FROM inventory WHERE id_player = ?;', [idPlayer]));
+            try { cl.send('inventoryUpdate', { bricks: newInv?.bricks || 0, rocks: newInv?.rocks || 0 }); } catch {}
+          } catch (e) {}
+        }
+
+        // If all houses completed, maybe finish the game (reuse existing logic)
+        try {
+          const allRows = await openDB().then(db3 => db3.all('SELECT id_map, tile_x, tile_y, progress, required FROM house_progress WHERE id_map = 5;'));
           const allDone = (allRows || []).length > 0 && (allRows || []).every(r => (r.progress || 0) >= (r.required || 50));
           if (allDone) {
             const db3 = await openDB();
@@ -470,12 +542,14 @@ export class GameRoom extends Room {
               }
             });
           }
-        } catch {}
+        } catch (e) {}
       } catch (err) {
-        console.error('Failed to build house', err);
-        try { await openDB().then(db => db.exec('ROLLBACK;')); } catch {}
+        console.error('Failed to flush house contributions', err);
+        try { const db2 = await openDB(); await db2.exec('ROLLBACK;'); } catch {}
+      } finally {
+        this.pendingHouseContribs.clear();
       }
-    });
+    }, 1000);
 
     // Partner sends counter-offer back to proposer
     this.onMessage("tradeCounterOffer", (client, data) => {
@@ -687,5 +761,7 @@ export class GameRoom extends Room {
   // Clean up intervals when room is disposed
   onDispose() {
     try { clearInterval(this._factoryFlushInterval); } catch {}
+    try { clearInterval(this._flowerFlushInterval); } catch {}
+    try { clearInterval(this._houseFlushInterval); } catch {}
   }
 }
