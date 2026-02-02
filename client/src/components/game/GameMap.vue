@@ -502,6 +502,11 @@ import house3Img from '../../assets/maps/house3.png';
 import Tile from './Tile.vue';
 import PlayerSprite from './PlayerSprite.vue';
 import bgTrack from '../../assets/music/bg.mp3';
+import map1bg from '../../assets/music/map1bg.mp3';
+import map2bg from '../../assets/music/map2bg.mp3';
+import map3bg from '../../assets/music/map3bg.mp3';
+import map4bg from '../../assets/music/map4bg.mp3';
+import map5bg from '../../assets/music/map5bg.mp3';
 import hit1 from '../../assets/music/hit1.mp3';
 import hit2 from '../../assets/music/hit2.mp3';
 import hit3 from '../../assets/music/hit3.mp3';
@@ -1338,6 +1343,14 @@ const musicEnabled = ref(localStorage.getItem('musicEnabled') === 'false' ? fals
 const sfxEnabled = ref(localStorage.getItem('sfxEnabled') === 'false' ? false : true);
 const bgMusic = ref(null);
 const musicSrc = ref(''); // placeholder for future music file
+// per-map background tracks
+const mapBgById = {
+	1: map1bg,
+	2: map2bg,
+	3: map3bg,
+	4: map4bg,
+	5: map5bg,
+};
 
 function openSettings() {
 	showSettings.value = true;
@@ -1363,6 +1376,15 @@ watch(musicEnabled, (v) => {
 });
 watch(sfxEnabled, (v) => {
 	localStorage.setItem('sfxEnabled', String(!!v));
+});
+// Update background track when switching maps
+watch(() => activeMapId.value, (id) => {
+	try {
+		musicSrc.value = mapBgById[id] || bgTrack;
+		if (musicEnabled.value && bgMusic.value && musicSrc.value) {
+			try { bgMusic.value.load(); bgMusic.value.play().catch(() => {}); } catch (e) {}
+		}
+	} catch (e) { /* noop */ }
 });
 const chatTimers = new Map();
 
@@ -1956,7 +1978,7 @@ onMounted(async () => {
 
 			// Wire background music if provided (user placed file at client/src/assets/music/bg.mp3)
 			try {
-				musicSrc.value = bgTrack;
+				musicSrc.value = mapBgById[activeMapId.value] || bgTrack;
 				// If enabled and element available, try to play (may be blocked until user gesture)
 				if (musicEnabled.value && bgMusic.value && musicSrc.value) {
 					try { bgMusic.value.load(); bgMusic.value.play().catch(() => {}); } catch (e) {}

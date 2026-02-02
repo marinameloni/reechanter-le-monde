@@ -17,9 +17,67 @@ export class GameRoom extends Room {
     // Map username to Colyseus client for direct messaging
     this.clientByUsername = new Map();
 
+    // Load ruins from DB for this map into room state so clients see them
+    (async () => {
+      try {
+        const db = await openDB();
+        const rows = await db.all(
+          `SELECT r.id_ruin, r.id_tile, r.type, r.clicks_current, r.clicks_required, r.is_destroyed, t.x as x, t.y as y
+           FROM ruin r JOIN tile t ON r.id_tile = t.id_tile
+           WHERE r.id_map = ?;`,
+          [this.mapId]
+        );
+        this.state.ruins = (rows || []).map(r => ({
+          id_ruin: r.id_ruin,
+          id_tile: r.id_tile,
+          x: r.x,
+          y: r.y,
+          type: r.type,
+          clicks_current: r.clicks_current || 0,
+          clicks_required: r.clicks_required || 0,
+          is_destroyed: r.is_destroyed || 0,
+        }));
+      } catch (err) {
+        console.error('Failed to load ruins into room state', err);
+      }
+    })();
+
+    // Per-player cooldowns / rate-limiting to avoid server overload
+    // Map sessionId -> { move: ts, water: ts, fence: ts, house: ts }
+    this.lastActionTime = new Map();
+    // Helper to check and update cooldown timestamp
+    this._canPerform = (sid, key, cooldownMs) => {
+      const now = Date.now();
+      const prev = this.lastActionTime.get(sid) || {};
+      if (prev[key] && (now - prev[key]) < cooldownMs) return false;
+      prev[key] = now;
+      this.lastActionTime.set(sid, prev);
+      return true;
+    };
+
+    // Helper to check player distance to a tile/element
+    // returns true if within `range` tiles (Euclidean distance)
+    this._isInRange = (sessionId, x, y, range = 2) => {
+      const player = this.state.clients.find(c => c.sessionId === sessionId);
+      if (!player || typeof player.x !== 'number' || typeof player.y !== 'number') return false;
+      const dx = player.x - x;
+      const dy = player.y - y;
+      return (Math.sqrt(dx * dx + dy * dy) <= range + 1e-9);
+    };
+
+    // Cap per-player pending factory clicks per flush interval to avoid huge spikes
+    this.factoryPerIntervalCap = 50;
+
     this.onMessage("clickRuin", (client, data) => {
       const ruin = this.state.ruins.find((r) => r.id_ruin === data.id_ruin);
       if (ruin) {
+        // If ruin has coordinates, enforce proximity
+        const rx = typeof ruin.x === 'number' ? ruin.x : (typeof ruin.tile_x === 'number' ? ruin.tile_x : null);
+        const ry = typeof ruin.y === 'number' ? ruin.y : (typeof ruin.tile_y === 'number' ? ruin.tile_y : null);
+        if (rx !== null && ry !== null && !this._isInRange(client.sessionId, rx, ry, 2)) {
+          try { client.send('actionDenied', { action: 'clickRuin', reason: 'out_of_range' }); } catch {}
+          return;
+        }
         ruin.clicks_current = (ruin.clicks_current || 0) + (data.click_value || 1);
       }
       // Colyseus se charge de synchroniser l'état avec tous les clients
@@ -178,24 +236,37 @@ export class GameRoom extends Room {
 
     // Accept individual or batched messages and buffer them
     this.onMessage("factoryClick", (client, data) => {
-      const inc = (data && typeof data.inc === 'number') ? data.inc : 1;
+      const inc = (data && typeof data.inc === 'number') ? Math.max(0, Math.floor(data.inc)) : 1;
+      if (inc <= 0) return;
       const sid = client.sessionId;
       const prev = this.pendingFactoryClicks.get(sid) || 0;
-      this.pendingFactoryClicks.set(sid, prev + inc);
+      const allowed = Math.max(0, this.factoryPerIntervalCap - prev);
+      const toAdd = Math.min(inc, allowed);
+      if (toAdd <= 0) {
+        // optionally ignore excess clicks
+        try { client.send('factoryClickDenied', { reason: 'rate_limited' }); } catch {}
+        return;
+      }
+      this.pendingFactoryClicks.set(sid, prev + toAdd);
       // Immediate ack so client can update local UI optimistically
-      try { client.send('factoryClickQueued', { inc }); } catch {}
+      try { client.send('factoryClickQueued', { inc: toAdd }); } catch {}
     });
 
     // Backwards-compatible alias: clients may send a batched message named "clickFactory"
     this.onMessage('clickFactory', (client, data) => {
       // data: { inc: number }
-      const inc = (data && typeof data.inc === 'number') ? data.inc : 0;
-      if (inc > 0) {
-        const sid = client.sessionId;
-        const prev = this.pendingFactoryClicks.get(sid) || 0;
-        this.pendingFactoryClicks.set(sid, prev + inc);
-        try { client.send('factoryClickQueued', { inc }); } catch {}
+      const inc = (data && typeof data.inc === 'number') ? Math.max(0, Math.floor(data.inc)) : 0;
+      if (inc <= 0) return;
+      const sid = client.sessionId;
+      const prev = this.pendingFactoryClicks.get(sid) || 0;
+      const allowed = Math.max(0, this.factoryPerIntervalCap - prev);
+      const toAdd = Math.min(inc, allowed);
+      if (toAdd <= 0) {
+        try { client.send('factoryClickDenied', { reason: 'rate_limited' }); } catch {}
+        return;
       }
+      this.pendingFactoryClicks.set(sid, prev + toAdd);
+      try { client.send('factoryClickQueued', { inc: toAdd }); } catch {}
     });
 
     // Shared watering per tile on Map 3 (former factory tiles)
@@ -205,6 +276,18 @@ export class GameRoom extends Room {
       const x = (data && typeof data.x === 'number') ? data.x : null;
       const y = (data && typeof data.y === 'number') ? data.y : null;
       if (mapId !== 3 || x == null || y == null) return;
+      const sid = client.sessionId;
+      // enforce proximity: must be within 2 tiles
+      if (!this._isInRange(sid, x, y, 2)) {
+        try { client.send('actionDenied', { action: 'water', reason: 'out_of_range' }); } catch {}
+        return;
+      }
+      // enforce cooldown per player for watering to avoid spam
+      const sid = client.sessionId;
+      if (!this._canPerform(sid, 'water', 800)) {
+        try { client.send('actionDenied', { action: 'water', reason: 'cooldown' }); } catch {}
+        return;
+      }
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');
@@ -245,6 +328,17 @@ export class GameRoom extends Room {
       const mapId = this.mapId ?? 4;
       if (x == null || y == null) return;
       if (mapId !== 4) return; // only valid in Map 4 room
+      // proximity check: must be near tile
+      if (!this._isInRange(client.sessionId, x, y, 2)) {
+        try { client.send('actionDenied', { action: 'fence', reason: 'out_of_range' }); } catch {}
+        return;
+      }
+      // throttle fence builds per player
+      const sid = client.sessionId;
+      if (!this._canPerform(sid, 'fence', 1000)) {
+        try { client.send('actionDenied', { action: 'fence', reason: 'cooldown' }); } catch {}
+        return;
+      }
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');
@@ -282,6 +376,17 @@ export class GameRoom extends Room {
       const mapId = this.mapId ?? 5;
       if (x == null || y == null) return;
       if (mapId !== 5) return; // only valid in Map 5 room
+      // proximity check: must be near site
+      if (!this._isInRange(client.sessionId, x, y, 2)) {
+        try { client.send('actionDenied', { action: 'house', reason: 'out_of_range' }); } catch {}
+        return;
+      }
+      // throttle house build contributions per player
+      const sid = client.sessionId;
+      if (!this._canPerform(sid, 'house', 1200)) {
+        try { client.send('actionDenied', { action: 'house', reason: 'cooldown' }); } catch {}
+        return;
+      }
       const validSites = new Set(['14,13','8,7','28,7']);
       const key = `${x},${y}`;
       if (!validSites.has(key)) return;
@@ -409,18 +514,26 @@ export class GameRoom extends Room {
       player.x = data.x;
       player.y = data.y;
 
-      // diffuse les nouvelles positions à tous les clients
+      // diffuse les nouvelles positions à tous les clients (keep responsive)
       this.broadcast("clients", this.state.clients);
 
-      // Persiste également la position dans la base (player.x / player.y)
-      try {
-        const db = await openDB();
-        await db.run(
-          `UPDATE player SET x = ?, y = ? WHERE username = ?;`,
-          [player.x, player.y, player.username]
-        );
-      } catch (err) {
-        console.error("Failed to persist player position", err);
+      // Persist player position to DB at most once every second per player
+      const sid = client.sessionId;
+      const movePersistMs = 1000;
+      const prev = this.lastActionTime.get(sid) || {};
+      const now = Date.now();
+      if (!prev.move || (now - prev.move) >= movePersistMs) {
+        try {
+          const db = await openDB();
+          await db.run(
+            `UPDATE player SET x = ?, y = ? WHERE username = ?;`,
+            [player.x, player.y, player.username]
+          );
+          prev.move = now;
+          this.lastActionTime.set(sid, prev);
+        } catch (err) {
+          console.error("Failed to persist player position", err);
+        }
       }
     });
   }
