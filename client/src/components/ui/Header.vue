@@ -49,6 +49,7 @@ import headerImg from '../../assets/header.jpg';
     margin: 0 auto 0px;
     position: relative;
     z-index: 60;
-    margin-bottom: 50px;
+    margin-bottom: 20px;
+    border-radius: 6px;
 }
 </style>

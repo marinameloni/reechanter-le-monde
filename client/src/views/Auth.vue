@@ -58,12 +58,15 @@
         </button>
       </div>
     </div>
+  
+    <Footer />
   </section>
 </template>
 
 <script setup>
 import { reactive, ref, watch, onBeforeUnmount } from 'vue';
 import Header from '../components/ui/Header.vue';
+import Footer from '../components/ui/Footer.vue';
 import SignupSpritePreview from '../components/game/SignupSpritePreview.vue';
 import robotPlaceholder from '../assets/sprites/default/front.svg';
 import api from '../services/api';
@@ -133,7 +136,7 @@ const handleSignup = async () => {
 
 .index-landing {
   min-height: 100vh;
-  background-color: #243726;
+  background-color: #1B7FA3;
   display: block;
   justify-content: center;
   align-items: center;
@@ -144,9 +147,9 @@ const handleSignup = async () => {
   width: 900px;
   height: 550px;
   position: relative;
-  border: 6px solid #5b4a33;
+  border: 6px solid #FFCF4D;
   border-radius: 20px;
-  background: #38523c;
+  background: #082F45;
   display: flex;
   flex-direction: column;
 }
@@ -171,7 +174,7 @@ const handleSignup = async () => {
 }
 
 .card-inner {
-  background: #2f4a36;
+  background: #082F45;
   height: 100%;
   border-radius: 14px;
   display: flex;
@@ -199,7 +202,7 @@ const handleSignup = async () => {
 .cp-input {
   width: 100%;
   padding: 10px;
-  border: 2px solid #3e4a3e;
+  border: 2px solid #048BA8;
   border-radius: 4px;
   margin-bottom: 15px;
   font-size: 1.1rem;
@@ -211,18 +214,18 @@ const handleSignup = async () => {
 .checkbox-group label { font-weight: normal; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;}
 
 .btn-cp-login {
-  background: linear-gradient(#7a8f6d, #2f4a36);
-  border: 3px solid #3e4a3e;
+  background: linear-gradient(#19A9EE, #048BA8);
+  border: 3px solid #048BA8;
   border-radius: 50px;
   color: white;
   padding: 10px 40px;
   font-size: 1.4rem;
   font-weight: bold;
   cursor: pointer;
-  box-shadow: 0 4px 0 #5b4a33;
+  box-shadow: 0 4px 0 #FFCF4D;
 }
 
-.btn-cp-login:active { transform: translateY(2px); box-shadow: 0 2px 0 #5b4a33; }
+.btn-cp-login:active { transform: translateY(2px); box-shadow: 0 2px 0 #FFCF4D; }
 
 .secondary-links { margin-top: 20px; display: flex; flex-direction: column; gap: 5px; }
 .secondary-links a { color: white; text-decoration: none; font-size: 0.9rem; }
@@ -244,9 +247,9 @@ const handleSignup = async () => {
 }
 
 .ui-footer { 
-  background: #263622; 
+  background: #082F45; 
   height: 80px; 
-  border-top: 6px solid #5b4a33; 
+  border-top: 6px solid #FFCF4D; 
   display: flex; 
   justify-content: center; 
   align-items: flex-end; 

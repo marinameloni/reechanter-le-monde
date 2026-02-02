@@ -26,10 +26,12 @@
       </div>
     </div>
   </section>
+    <Footer />
 </template>
 
 <script setup>
 import Header from '../components/ui/Header.vue';
+import Footer from '../components/ui/Footer.vue';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import screen1 from '../assets/screen1.jpg';
@@ -52,11 +54,11 @@ onBeforeUnmount(() => { if (autoplay) clearInterval(autoplay); });
 
 <style>
 body {
-    background-color: #243726;
+    background-color: #1B7FA3; /* muted teal, easier on eyes */
 }
 .index-landing {
   min-height: 100vh;
-  background-color: #243726;
+  background-color: #1B7FA3;
   display: block; /* use normal document flow so page can scroll */
   font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
   padding: 24px 8px; /* more breathing room at top */
@@ -68,11 +70,11 @@ body {
   max-width: 760px;
   /* allow container to grow naturally and let page scroll */
   position: relative;
-  border: 6px solid #5b4a33; /* Earthy brown frame */
+  border: 6px solid #FFCF4D; /* softer yellow accent */
   border-radius: 16px;
   overflow: hidden;
-  background: #334a37;
-  box-shadow: 0 12px 24px rgba(0,0,0,0.22);
+  background: linear-gradient(180deg,#082F45 0%,#1B7FA3 100%); /* deep inner blue -> muted teal */
+  box-shadow: 0 8px 18px rgba(0,0,0,0.18);
   margin: 0 auto;
 }
 
@@ -80,7 +82,7 @@ body {
 .screen-area {
   aspect-ratio: 4 / 3;
   position: relative;
-  background: #2f4a36;
+  background: #082F45; /* darker inner blue for contrast */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,9 +107,9 @@ body {
 
 /* The Blue Bottom Bar */
 .ui-footer {
-  background: #263622;
+  background: #082F45;
   height: 84px;
-  border-top: 5px solid #5b4a33;
+  border-top: 5px solid #FFCF4D;
   position: relative;
   display: flex;
   justify-content: center;
@@ -121,9 +123,9 @@ body {
   top: -24px;
   left: 50%;
   transform: translateX(-50%);
-  background: #263622;
+  background: #082F45;
   padding: 6px 16px;
-  border: 5px solid #5b4a33;
+  border: 5px solid #FFCF4D;
   border-bottom: none;
   border-radius: 16px 16px 0 0;
   min-width: 150px;
@@ -146,15 +148,15 @@ body {
   font-style: italic;
   font-weight: bold;
   color: white;
-  border: 2px solid #3e4a3e;
+  border: 2px solid #048BA8; /* slightly deeper cyan border */
   border-radius: 10px;
   cursor: pointer;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
   transition: transform 0.1s;
 }
 
-.btn-create { background: linear-gradient(#7a8f6d, #2f4a36); }
-.btn-login { background: linear-gradient(#7a8f6d, #2f4a36); }
+.btn-create { background: linear-gradient(#19A9EE, #048BA8); }
+.btn-login { background: linear-gradient(#19A9EE, #048BA8); }
 
 .btn-create:hover, .btn-login:hover {
   transform: scale(1.02);
@@ -178,12 +180,12 @@ body {
   height: 12px;
   border-radius: 50%;
   border: 2px solid #fff;
-  background: #999;
+  background: #FFCF4D;
   cursor: pointer;
 }
 
 .dots button.active {
-  background: #b88646; /* Muted ochre */
+  background: #FFD976;
   transform: scale(1.2);
 }
 

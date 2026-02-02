@@ -2253,7 +2253,7 @@ async function tryTravelToMap5() {
 	grid-column: 1 / span 3; /* spans 3 of 4 columns */
 	padding: 8px 10px;
 	border-radius: 12px;
-	border: 1.5px solid #5b4a33; /* inner earthy stroke */
+	border: 1.5px solid #FFCF4D; /* inner palette stroke */
 	outline: none;
 	background: rgba(255,255,255,0.98);
 	font-size: 13px;
@@ -2283,8 +2283,8 @@ async function tryTravelToMap5() {
 }
 .settings-card {
 	width: min(360px, calc(100% - 48px));
-	background: #334a37;
-	border: 1px solid #5b4a33;
+	background: #082F45;
+	border: 1px solid #FFCF4D;
 	padding: 14px;
 	border-radius: 12px;
 	box-shadow: 0 8px 24px rgba(0,0,0,0.5);
@@ -2298,7 +2298,7 @@ async function tryTravelToMap5() {
 
 /* User popup */
 .user-popup { pointer-events:auto; }
-.user-card { display:flex; gap:18px; align-items:flex-start; background:#334a37; border:1px solid #5b4a33; padding:14px; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,0.5); color:#fff; width: min(560px, calc(100% - 48px)); }
+.user-card { display:flex; gap:18px; align-items:flex-start; background:#082F45; border:1px solid #FFCF4D; padding:14px; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,0.5); color:#fff; width: min(560px, calc(100% - 48px)); }
 .user-left { display:flex; flex-direction:column; gap:12px; align-items:flex-start; min-width:180px; }
 .player-name { font-weight:800; font-size:16px; background:rgba(255,255,255,0.06); padding:8px 12px; border-radius:10px; }
 .user-right h4 { margin:0 0 8px 0; font-size:16px; }
@@ -2316,7 +2316,7 @@ async function tryTravelToMap5() {
 
 /* Top-right value display */
 .top-right-values { position: absolute; top: 8px; right: 8px; z-index: 110; pointer-events: none; }
-.top-right-values .value-card { pointer-events: auto; background: #334a37; border: 1px solid #5b4a33; color: #fff; padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); font-size: 13px; }
+.top-right-values .value-card { pointer-events: auto; background: #082F45; border: 1px solid #FFCF4D; color: #fff; padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); font-size: 13px; }
 .top-right-values .value-card p { margin: 4px 0; }
 
 
@@ -2389,7 +2389,7 @@ async function tryTravelToMap5() {
 	height: 56px;
 	border-radius: 6px;
 	/* inner stroke (earthy) */
-	border: 2px solid #5b4a33;
+	border: 2px solid #FFCF4D;
 	background: linear-gradient(180deg,#efeef3,#e6e2ea);
 	display:flex;align-items:center;justify-content:center;position:relative;
 }
@@ -2423,7 +2423,7 @@ async function tryTravelToMap5() {
 	padding: 0;
 	border: 2px solid #000000; /* outer stroke black */
 	border-radius: 8px;
-	background: #334a37; /* panel background */
+	background: #082F45; /* panel background */
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -2431,7 +2431,7 @@ async function tryTravelToMap5() {
 	box-shadow: 0 4px 8px rgba(0,0,0,0.35);
 }
 .ml-inner {
-	display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:2px solid #5b4a33; /* inner earthy stroke */background: linear-gradient(180deg,#efeef3,#e6e2ea);font-size:18px;
+	display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:2px solid #FFCF4D; /* inner palette stroke */background: linear-gradient(180deg,#efeef3,#e6e2ea);font-size:18px;
 }
 .ml-btn:active { transform: translateY(1px); }
 
@@ -2545,13 +2545,13 @@ async function tryTravelToMap5() {
 	z-index: 100;
 }
 .exchange-card {
-	background: #334a37;
+	background: #082F45;
 	color: #fff;
 	padding: 16px;
 	border-radius: 8px;
 	width: 280px;
 	box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-	border: 1px solid #5b4a33;
+	border: 1px solid #FFCF4D;
 }
 .exchange-card.wide {
 	width: 560px;
@@ -2562,7 +2562,7 @@ async function tryTravelToMap5() {
 	gap: 12px;
 }
 .panel {
-	border: 1px solid #5b4a33;
+	border: 1px solid #FFCF4D;
 	border-radius: 6px;
 	padding: 8px;
 }
@@ -2606,6 +2606,6 @@ async function tryTravelToMap5() {
 	cursor: not-allowed;
 }
 .btn.close {
-	background: #5b4a33;
+	background: #FFCF4D;
 }
 </style>

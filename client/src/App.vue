@@ -12,7 +12,7 @@
 /* style global simple */
 #app {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #fafafa;
+  background-color: #1B7FA3;
   min-height: 100vh;
   color: #333;
 }

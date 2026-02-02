@@ -46,12 +46,15 @@
         </div>
       </div>
     </div>
+  
+    <Footer />
   </section>
 </template>
 
 <script setup>
 import { reactive, ref, watch, onMounted } from 'vue';
 import Header from '../components/ui/Header.vue';
+import Footer from '../components/ui/Footer.vue';
 import SignupSpritePreview from '../components/game/SignupSpritePreview.vue';
 import frontDefault from '../assets/sprites/default/front.svg?raw';
 import { useRouter } from 'vue-router';
@@ -103,11 +106,11 @@ const handleSignup = async () => {
 </script>
 
 <style scoped>
-.index-landing { min-height: 100vh; background-color: #243726; display: block; justify-content: center; align-items: center; font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif; }
-.game-container { width: 900px; height: 550px; position: relative; border: 6px solid #5b4a33; border-radius: 20px; background: #38523c; display: flex; flex-direction: column; }
+.index-landing { min-height: 100vh; background-color: #1B7FA3; display: block; justify-content: center; align-items: center; font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif; }
+.game-container { width: 900px; height: 550px; position: relative; border: 6px solid #FFCF4D; border-radius: 20px; background: #082F45; display: flex; flex-direction: column; }
 .auth-content { display: flex; flex: 1; padding: 40px; gap: 40px; align-items: center; }
 .player-card { flex: 1; background: #fff; padding: 5px; border-radius: 18px; height: 350px; max-width: 280px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-.card-inner { background: #2f4a36; height: 100%; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: space-around; overflow: hidden; position: relative; }
+.card-inner { background: #082F45; height: 100%; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: space-around; overflow: hidden; position: relative; }
 .display-name { color: white; text-transform: uppercase; font-style: italic; font-size: 2rem; margin: 0; text-shadow: 2px 2px 0px rgba(0,0,0,0.3); }
 .robot-placeholder { width: 100px; height: 150px; background: rgba(255,255,255,0.05); border-radius: 20px; }
 .sprite-container { width: 120px; height: 160px; display: flex; align-items: center; justify-content: center; }
@@ -116,14 +119,14 @@ const handleSignup = async () => {
 .svg-preview { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
 .svg-preview svg { max-width: 100%; max-height: 100%; display: block; }
 .form-container { flex: 1; position: relative; color: white; }
-.cp-input { width: 100%; padding: 10px; border: 2px solid #3e4a3e; color: #fff; border-radius: 4px; margin-bottom: 15px; font-size: 1.1rem; background: rgba(255,255,255,0.02); }
+.cp-input { width: 100%; padding: 10px; border: 2px solid #048BA8; color: #fff; border-radius: 4px; margin-bottom: 15px; font-size: 1.1rem; background: rgba(255,255,255,0.02); }
 .checkbox-group { font-size: 0.9rem; margin-bottom: 20px; }
-.btn-cp-login { background: linear-gradient(#7a8f6d, #2f4a36); border: 3px solid #3e4a3e; border-radius: 50px; color: white; padding: 10px 40px; font-size: 1.4rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #5b4a33; }
-.btn-cp-login:active { transform: translateY(2px); box-shadow: 0 2px 0 #5b4a33; }
+.btn-cp-login { background: linear-gradient(#19A9EE, #048BA8); border: 3px solid #048BA8; border-radius: 50px; color: white; padding: 10px 40px; font-size: 1.4rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #FFCF4D; }
+.btn-cp-login:active { transform: translateY(2px); box-shadow: 0 2px 0 #FFCF4D; }
 .secondary-links { margin-top: 20px; display: flex; flex-direction: column; gap: 5px; }
 .secondary-links a { color: white; text-decoration: none; font-size: 0.9rem; }
 .sticky-note { position: absolute; bottom: -60px; right: -20px; background: #d6a94a; color: #333; padding: 15px; width: 140px; font-size: 0.8rem; font-weight: bold; transform: rotate(5deg); box-shadow: 5px 5px 10px rgba(0,0,0,0.2); text-align: center; border-bottom-right-radius: 30px 5px; }
-.ui-footer { background: #263622; height: 80px; border-top: 6px solid #5b4a33; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 10px; }
+.ui-footer { background: #082F45; height: 80px; border-top: 6px solid #FFCF4D; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 10px; }
 .switch-mode-btn { background: none; border: none; color: white; text-decoration: underline; cursor: pointer; font-size: 1rem; }
 .color-selector { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
 .color-option { width: 20px; height: 20px; border-radius: 4px; cursor: pointer; border: 1px solid #fff; }

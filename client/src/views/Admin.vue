@@ -41,11 +41,13 @@
 		</div>
 		<p v-if="toolsMessage" :class="['banner', toolsType]">{{ toolsMessage }}</p>
 	</div>
+	<Footer />
 	</template>
 
 <script setup>
 import { ref } from 'vue';
 import Header from '../components/ui/Header.vue';
+import Footer from '../components/ui/Footer.vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api.js';
 import { useAuthStore } from '../store/auth.store.js';

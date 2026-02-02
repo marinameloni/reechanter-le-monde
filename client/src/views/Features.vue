@@ -118,21 +118,25 @@
         <p>Si vous voulez que j'ajoute une fonctionnalité manquante ou que je détaille une fonctionnalité, dites laquelle.</p>
       </footer>
     </main>
+
+    <Footer />
+
   </section>
 </template>
 
 <script setup>
 import Header from '../components/ui/Header.vue';
+import Footer from '../components/ui/Footer.vue';
 // Simple static page — no script logic required for now
 </script>
 
 <style scoped>
-.features-page { padding: 24px; background: #243726; color: #fff; min-height: 100vh; }
+.features-page { padding: 24px; background: #1B7FA3; color: #fff; min-height: 100vh; }
 .features-header { max-width: 980px; margin: 0 auto 18px; }
-.features-header h1 { margin: 0 0 8px; color: #d6a94a; }
-.lead { color: #dfeadb; margin: 0 0 12px; }
-.features-main { max-width: 980px; margin: 0 auto; background: #334a37; padding: 20px; border: 1px solid #5b4a33; border-radius: 12px; }
-.features-main h2 { color: #d6a94a; margin-top: 12px; }
-.features-main ul { margin: 6px 0 12px 18px; }
-.features-footer { margin-top: 18px; color: #e6e6d8; }
+.features-header h1 { margin: 0 0 8px; color: #FFCF4D; }
+.lead { color: #e6f6fb; margin: 0 0 12px; }
+.features-main { max-width: 980px; margin: 0 auto; background: #082F45; padding: 20px; border: 1px solid #FFCF4D; border-radius: 12px; }
+.features-main h2 { color: #FFCF4D; margin-top: 12px; }
+.features-main ul { margin: 6px 0 12px 18px; color: #e6f6fb; }
+.features-footer { margin-top: 18px; color: #e6f6fb; }
 </style>

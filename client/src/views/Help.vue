@@ -65,20 +65,25 @@
 				<p>Besoin d'un complément ? Dis-moi quelle fonctionnalité tu veux documenter davantage.</p>
 			</footer>
 		</main>
-	</section>
+
+		<Footer />
+
+		</section>
 </template>
 
 <script setup>
 import Header from '../components/ui/Header.vue';
+import Footer from '../components/ui/Footer.vue';
+
 </script>
 
 <style scoped>
-.help-page { min-height: 100vh; background: #243726; color: #fff; padding-bottom: 40px;  }
-.help-main { max-width: 980px; margin: 24px auto; background: #334a37; padding: 22px; border-radius: 12px; border: 1px solid #5b4a33; margin-top: 4rem; }
-.help-main h1 { color: #d6a94a; margin-top: 4px; }
-.lead { color: #dfeadb; }
-.help-main h2 { color: #d6a94a; margin-top: 12px; }
-.help-main ul, .help-main ol { margin-left: 18px; }
-.help-footer { margin-top: 18px; color: #e6e6d8; }
+.help-page { min-height: 100vh; background: #1B7FA3; color: #fff; padding-bottom: 40px; }
+.help-main { max-width: 980px; margin: 24px auto; background: #082F45; padding: 22px; border-radius: 12px; border: 1px solid #FFCF4D; margin-top: 4rem; color: #e6f6fb; }
+.help-main h1 { color: #FFCF4D; margin-top: 4px; }
+.lead { color: #e6f6fb; }
+.help-main h2 { color: #FFCF4D; margin-top: 12px; }
+.help-main ul, .help-main ol { margin-left: 18px; color: #e6f6fb; }
+.help-footer { margin-top: 18px; color: #e6f6fb; }
 </style>
 
