@@ -57,7 +57,7 @@ export class GameRoom extends Room {
 
     // Helper to check player distance to a tile/element
     // returns true if within `range` tiles (Euclidean distance)
-    this._isInRange = (sessionId, x, y, range = 2) => {
+    this._isInRange = (sessionId, x, y, range = 3) => {
       const player = this.state.clients.find(c => c.sessionId === sessionId);
       if (!player || typeof player.x !== 'number' || typeof player.y !== 'number') return false;
       const dx = player.x - x;
@@ -74,7 +74,7 @@ export class GameRoom extends Room {
         // If ruin has coordinates, enforce proximity
         const rx = typeof ruin.x === 'number' ? ruin.x : (typeof ruin.tile_x === 'number' ? ruin.tile_x : null);
         const ry = typeof ruin.y === 'number' ? ruin.y : (typeof ruin.tile_y === 'number' ? ruin.tile_y : null);
-        if (rx !== null && ry !== null && !this._isInRange(client.sessionId, rx, ry, 2)) {
+        if (rx !== null && ry !== null && !this._isInRange(client.sessionId, rx, ry, 3)) {
           try { client.send('actionDenied', { action: 'clickRuin', reason: 'out_of_range' }); } catch {}
           return;
         }
@@ -280,8 +280,8 @@ export class GameRoom extends Room {
       const y = (data && typeof data.y === 'number') ? data.y : null;
       if (mapId !== 3 || x == null || y == null) return;
       const sid = client.sessionId;
-      // enforce proximity: must be within 2 tiles
-      if (!this._isInRange(sid, x, y, 2)) {
+      // enforce proximity: must be within 3 tiles
+      if (!this._isInRange(sid, x, y, 3)) {
         try { client.send('actionDenied', { action: 'water', reason: 'out_of_range' }); } catch {}
         return;
       }
@@ -366,8 +366,8 @@ export class GameRoom extends Room {
       const mapId = this.mapId ?? 4;
       if (x == null || y == null) return;
       if (mapId !== 4) return; // only valid in Map 4 room
-      // proximity check: must be near tile
-      if (!this._isInRange(client.sessionId, x, y, 2)) {
+      // proximity check: must be near tile (3 tiles)
+      if (!this._isInRange(client.sessionId, x, y, 3)) {
         try { client.send('actionDenied', { action: 'fence', reason: 'out_of_range' }); } catch {}
         return;
       }
@@ -415,7 +415,7 @@ export class GameRoom extends Room {
       if (mapId !== 5) return;
       // proximity check
       const sid = client.sessionId;
-      if (!this._isInRange(sid, x, y, 2)) {
+      if (!this._isInRange(sid, x, y, 3)) {
         try { client.send('actionDenied', { action: 'house', reason: 'out_of_range' }); } catch {}
         return;
       }
