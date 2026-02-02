@@ -501,7 +501,6 @@ import house2Img from '../../assets/maps/house2.png';
 import house3Img from '../../assets/maps/house3.png';
 import Tile from './Tile.vue';
 import PlayerSprite from './PlayerSprite.vue';
-import bgTrack from '../../assets/music/bg.mp3';
 import map1bg from '../../assets/music/map1bg.mp3';
 import map2bg from '../../assets/music/map2bg.mp3';
 import map3bg from '../../assets/music/map3bg.mp3';
