@@ -283,7 +283,6 @@ export class GameRoom extends Room {
         return;
       }
       // enforce cooldown per player for watering to avoid spam
-      const sid = client.sessionId;
       if (!this._canPerform(sid, 'water', 800)) {
         try { client.send('actionDenied', { action: 'water', reason: 'cooldown' }); } catch {}
         return;
