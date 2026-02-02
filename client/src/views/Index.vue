@@ -56,25 +56,24 @@ body {
 }
 .index-landing {
   min-height: 100vh;
-  background-color: #243726; 
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  background-color: #243726;
+  display: block; /* use normal document flow so page can scroll */
   font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
-  padding: 8px;
+  padding: 24px 8px; /* more breathing room at top */
   position: relative;
 }
 
 .game-container {
   width: 94%;
   max-width: 760px;
-  max-height: calc(100vh - 12px);
+  /* allow container to grow naturally and let page scroll */
   position: relative;
   border: 6px solid #5b4a33; /* Earthy brown frame */
   border-radius: 16px;
   overflow: hidden;
   background: #334a37;
   box-shadow: 0 12px 24px rgba(0,0,0,0.22);
+  margin: 0 auto;
 }
 
 /* Screen area where images play */

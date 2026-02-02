@@ -134,7 +134,7 @@ const handleSignup = async () => {
 .index-landing {
   min-height: 100vh;
   background-color: #243726;
-  display: flex;
+  display: block;
   justify-content: center;
   align-items: center;
   font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;

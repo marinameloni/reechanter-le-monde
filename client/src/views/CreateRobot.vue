@@ -103,7 +103,7 @@ const handleSignup = async () => {
 </script>
 
 <style scoped>
-.index-landing { min-height: 100vh; background-color: #243726; display: flex; justify-content: center; align-items: center; font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif; }
+.index-landing { min-height: 100vh; background-color: #243726; display: block; justify-content: center; align-items: center; font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif; }
 .game-container { width: 900px; height: 550px; position: relative; border: 6px solid #5b4a33; border-radius: 20px; background: #38523c; display: flex; flex-direction: column; }
 .auth-content { display: flex; flex: 1; padding: 40px; gap: 40px; align-items: center; }
 .player-card { flex: 1; background: #fff; padding: 5px; border-radius: 18px; height: 350px; max-width: 280px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
