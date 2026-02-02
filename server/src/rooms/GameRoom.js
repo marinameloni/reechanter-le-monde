@@ -371,12 +371,7 @@ export class GameRoom extends Room {
         try { client.send('actionDenied', { action: 'fence', reason: 'out_of_range' }); } catch {}
         return;
       }
-      // throttle fence builds per player
-      const sid = client.sessionId;
-      if (!this._canPerform(sid, 'fence', 1000)) {
-        try { client.send('actionDenied', { action: 'fence', reason: 'cooldown' }); } catch {}
-        return;
-      }
+      // (no per-player cooldown — fence builds are rate-limited by client resources)
       try {
         const db = await openDB();
         await db.exec('BEGIN TRANSACTION;');

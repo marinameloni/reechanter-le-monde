@@ -1067,6 +1067,35 @@ function registerRoomHandlers() {
 			} catch (e) { console.warn('chat sfx failed', e); }
 		}
 	});
+
+	// Server-side denial / queue messages (e.g., proximity or rate limits)
+	gameStore.room.onMessage('actionDenied', (data) => {
+		const reason = data?.reason || data?.action || 'action_denied';
+		if (reason === 'out_of_range') showBanner('Too far away to interact.', 'warning');
+		else if (reason === 'cooldown') showBanner('Action temporarily throttled.', 'warning');
+		else showBanner('Action denied.', 'warning');
+	});
+
+	gameStore.room.onMessage('flowerClickQueued', (data) => {
+		// optional: small feedback when click queued
+		if (data && typeof data.inc === 'number') showBanner(`Queued ${data.inc} watering action(s)`, '');
+	});
+
+	gameStore.room.onMessage('flowerClickFlushed', (data) => {
+		if (data && typeof data.inc === 'number') showBanner(`Watering processed: +${data.inc}`, 'success');
+	});
+
+	gameStore.room.onMessage('flowerClickDenied', (data) => {
+		showBanner('Watering rate-limited, try again shortly.', 'warning');
+	});
+
+	gameStore.room.onMessage('houseContribQueued', (data) => {
+		if (data && typeof data.inc === 'number') showBanner(`Queued house contribution`, '');
+	});
+
+	gameStore.room.onMessage('houseContribDenied', (data) => {
+		showBanner('House contribution rate-limited.', 'warning');
+	});
 	gameStore.room.onMessage('factoryProgress', (data) => {
 		if (!data || typeof data.mapId !== 'number') return;
 		const m = data.mapId;
