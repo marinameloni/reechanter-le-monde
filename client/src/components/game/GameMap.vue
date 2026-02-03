@@ -10,6 +10,11 @@
 						<img src="../../assets/sprites/settinglogo.png">
 					</span>
 				</button>
+				<button class="ml-btn" title="Leaderboard" @click.prevent="openLeaderboard">
+					<span class="ml-inner">
+						<img :src="leaderboardImg" alt="Leaderboard" />
+					</span>
+				</button>
 				<button class="ml-btn" title="User" @click.prevent="openUser">
 					<span class="ml-inner">👤</span>
 				</button>
@@ -269,15 +274,7 @@
 				:style="{ transform: `translate(${p.x * mapObj.tileSize + p.ox}px, ${p.y * mapObj.tileSize + p.oy}px)` }"
 			></div>
 			<!-- Endgame overlay -->
-			<div v-if="gameFinished" class="endgame-overlay">
-				<h2>Monde Réanchanté! Bravo ! :)</h2>
-				<ul class="leaderboard">
-					<li>Joueur le plus constructif: {{ leaderboard.mostConstructive || '—' }}</li>
-					<li>Harvested the most: {{ leaderboard.mostHarvest || '—' }}</li>
-					<li>Pipelette de la partie: {{ leaderboard.mostTalkative || '—' }}</li>
-					<li>Did nothing: {{ leaderboard.didNothing || '—' }}</li>
-				</ul>
-			</div>
+			<!-- Endgame overlay removed: leaderboard modal will show automatically -->
 
 			<!-- In-map chat sender (bottom center, styled like classic arcade/chat bar) -->
 			<div class="chat-input map-chat" role="form">
@@ -321,6 +318,78 @@
 						</div>
 					</div>
 				</div>
+				</div>
+
+				<!-- Leaderboard modal -->
+					<div v-if="showLeaderboard" class="leaderboard-modal" role="dialog" aria-modal="true">
+						<div class="leaderboard-card">
+							<h3>Leaderboard</h3>
+							<template v-if="leaderboardCurrent">
+								<h4>Cette partie (map {{ leaderboardCurrent.mapId }})</h4>
+								<ul class="leaderboard">
+									<li v-if="leaderboardCurrent.mostConstructive">Joueur le plus constructif: {{ leaderboardCurrent.mostConstructive.username || leaderboardCurrent.mostConstructive || '—' }}</li>
+									<li v-if="leaderboardCurrent.mostHarvest">Celui qui a le plus récolté: {{ leaderboardCurrent.mostHarvest.username || leaderboardCurrent.mostHarvest || '—' }}</li>
+									<li v-if="leaderboardCurrent.mostTalkative">Pipelette de la partie: {{ leaderboardCurrent.mostTalkative.username || leaderboardCurrent.mostTalkative || '—' }}</li>
+									<li v-if="leaderboardCurrent.didNothing">Flemmard: {{ leaderboardCurrent.didNothing.username || leaderboardCurrent.didNothing || '—' }}</li>
+								</ul>
+
+								<!-- Podium: 3 spots with names on top and avatars -->
+								<h2>Podium des joueurs les plus constructifs</h2>
+								<div class="scoreboard__podiums">
+								<div class="scoreboard__podium js-podium" :data-height="podium.second.value ? (120 + Math.min(80, podium.second.value)) + 'px' : '120px'">
+										<div class="scoreboard__podium-base scoreboard__podium-base--second">
+											<div class="scoreboard__podium-rank">2</div>
+										</div>
+										<div class="scoreboard__podium-avatar" v-html="getSpriteByColor(podium.second.color)"></div>
+										<div class="scoreboard__podium-number">
+											{{ podium.second.username }}
+											<small><span class="js-podium-data">{{ podium.second.value ?? '' }}</span></small>
+										</div>
+									</div>
+									<div class="scoreboard__podium js-podium" :data-height="podium.first.value ? (120 + Math.min(80, podium.first.value)) + 'px' : '120px'">
+										<div class="scoreboard__podium-base scoreboard__podium-base--first">
+											<div class="scoreboard__podium-rank">1</div>
+										</div>
+										<div class="scoreboard__podium-avatar" v-html="getSpriteByColor(podium.first.color)"></div>
+										<div class="scoreboard__podium-number">
+											{{ podium.first.username }}
+											<small><span class="js-podium-data">{{ podium.first.value ?? '' }}</span></small>
+										</div>
+									</div>
+									<div class="scoreboard__podium js-podium" :data-height="podium.third.value ? (120 + Math.min(80, podium.third.value)) + 'px' : '120px'">
+										<div class="scoreboard__podium-base scoreboard__podium-base--third">
+											<div class="scoreboard__podium-rank">3</div>
+										</div>
+										<div class="scoreboard__podium-avatar" v-html="getSpriteByColor(podium.third.color)"></div>
+										<div class="scoreboard__podium-number">
+											{{ podium.third.username }}
+											<small><span class="js-podium-data">{{ podium.third.value ?? '' }}</span></small>
+										</div>
+									</div>
+								</div>
+
+							</template>
+							<template v-if="hasLeaderboard">
+								<h4>All-time</h4>
+								<ul class="leaderboard">
+									<li>Joueur le plus constructif: {{ leaderboardAllTime.mostConstructive?.username || leaderboardAllTime.mostConstructive || 'Pas de joueur' }}</li>
+									<li>Celui qui a le plus récolté: {{ leaderboardAllTime.mostHarvest?.username || leaderboardAllTime.mostHarvest || 'Pas de joueur' }}</li>
+									<li>Pipelette de la partie: {{ leaderboardAllTime.mostTalkative?.username || leaderboardAllTime.mostTalkative || 'Pas de joueur' }}</li>
+									<li>Flemmard: {{ leaderboardAllTime.didNothing?.username || leaderboardAllTime.didNothing || 'Pas de joueur' }}</li>
+								</ul>
+							</template>
+							<template v-if="!leaderboardCurrent && !hasLeaderboard">
+								<p class="hint">Aucun leaderboard disponible — joueurs connectés actuellement :</p>
+								<ul class="leaderboard">
+									<li v-for="c in gameStore.clients" :key="c.sessionId">{{ c.username || c.sessionId }}</li>
+								</ul>
+							</template>
+							<div class="settings-actions">
+								<button class="btn" @click="closeLeaderboard">Close</button>
+							</div>
+						</div>
+					</div>
+
 				<div class="hud">
 			<!-- <p>Position: ({{ playerX }}, {{ playerY }})</p> -->
 			<div v-if="bannerMessage" :class="['banner', bannerType]">{{ bannerMessage }}</div>
@@ -377,7 +446,7 @@
 				<button class="btn close" @click="showExchange = false">Close</button>
 			</div>
 		</div>
-	</div>
+	
 
 	<!-- Player Card Modal -->
 	<div v-if="showPlayerCard" class="exchange-modal">
@@ -499,6 +568,7 @@ import houseBaseImg from '../../assets/sprites/housebase.png';
 import house1Img from '../../assets/maps/house1.png';
 import house2Img from '../../assets/maps/house2.png';
 import house3Img from '../../assets/maps/house3.png';
+import leaderboardImg from '../../assets/leaderboard.png';
 import Tile from './Tile.vue';
 import PlayerSprite from './PlayerSprite.vue';
 import map1bg from '../../assets/music/map1bg.mp3';
@@ -512,6 +582,17 @@ import hit3 from '../../assets/music/hit3.mp3';
 import plantSfx from '../../assets/music/plant.mp3';
 import rockSfx from '../../assets/music/rock.mp3';
 import chatSfx from '../../assets/music/chatsound.mp3';
+
+// load raw SVG sprites so we can inline small avatars in the podium
+const sprites = import.meta.glob('/src/assets/sprites/**/*.svg', { query: '?raw', import: 'default', eager: true });
+
+function getSpriteByColor(color) {
+	const c = color || 'default';
+	const path = `/src/assets/sprites/${c}/front.svg`;
+	if (sprites[path]) return sprites[path];
+	const fallback = `/src/assets/sprites/default/front.svg`;
+	return sprites[fallback] || '';
+}
 
 const auth = useAuthStore();
 const gameStore = useGameStore();
@@ -610,7 +691,61 @@ const housesProgressDisplay = computed(() => {
 
 // Endgame state
 const gameFinished = ref(false);
-const leaderboard = ref({ mostConstructive: null, mostHarvest: null, mostTalkative: null, didNothing: null });
+const leaderboardAllTime = ref({ mostConstructive: null, mostHarvest: null, mostTalkative: null, didNothing: null });
+const leaderboardCurrent = ref(null);
+const showLeaderboard = ref(false);
+
+const hasLeaderboard = computed(() => {
+	const lb = leaderboardAllTime.value || {};
+	return Boolean(lb.mostConstructive || lb.mostHarvest || lb.mostTalkative || lb.didNothing);
+});
+
+async function fetchLeaderboard() {
+	try {
+		const res = await api.get('/api/game/leaderboard');
+		const data = res.data;
+		if (data && data.allTime) {
+			leaderboardAllTime.value = {
+				mostConstructive: data.allTime.mostConstructive || null,
+				mostHarvest: data.allTime.mostHarvest || null,
+				mostTalkative: data.allTime.mostTalkative || null,
+				didNothing: data.allTime.didNothing || null,
+			};
+		}
+		if (data && data.currentGame) {
+			leaderboardCurrent.value = data.currentGame;
+		}
+	} catch (e) {
+		// ignore; fallback to connected players list
+	}
+}
+
+async function openLeaderboard() { await fetchLeaderboard().catch(() => {}); showLeaderboard.value = true; }
+function closeLeaderboard() { showLeaderboard.value = false; }
+
+// Podium data (top-3) derived from currentGame topConstructive or connected clients
+const podium = computed(() => {
+	const top = (leaderboardCurrent && leaderboardCurrent.value && Array.isArray(leaderboardCurrent.value.topConstructive) && leaderboardCurrent.value.topConstructive.length)
+		? leaderboardCurrent.value.topConstructive
+		: null;
+	let items = [];
+	if (top) {
+		items = top.map(p => ({ username: p.username || '—', value: p.value || 0 }));
+	} else {
+		// fallback: use connected clients order
+		items = (gameStore.clients || []).map(c => ({ username: c.username || c.sessionId || '—', value: null }));
+	}
+	while (items.length < 3) items.push({ username: '—', value: null });
+	// attach color if available in connected clients
+	const attachColor = (it) => {
+		const match = (gameStore.clients || []).find(c => c.username === it.username);
+		return { ...it, color: (match && match.color) || 'default' };
+	};
+	const first = attachColor(items[0]);
+	const second = attachColor(items[1]);
+	const third = attachColor(items[2]);
+	return { first, second, third };
+});
 
 const unwalkableCoords = [
 	[8, 0],
@@ -1188,6 +1323,7 @@ function registerRoomHandlers() {
 				didNothing: data.leaderboard.didNothing || null,
 			};
 		}
+		showLeaderboard.value = true;
 	});
 	gameStore.room.onMessage('houseAllProgress', (data) => {
 		if (!data || data.mapId !== 5 || !Array.isArray(data.rows)) return;
@@ -1293,7 +1429,6 @@ const chatInput = ref('');
 const chatBubbles = ref({}); // { username: { text } }
 
 // Sprite loader for user popup (reuse same Vite glob as PlayerSprite)
-const sprites = import.meta.glob('/src/assets/sprites/**/*.svg', { query: '?raw', import: 'default', eager: true });
 const userSpriteSvg = ref('');
 const userSpriteName = computed(() => 'front');
 const userSpritePath = computed(() => {
@@ -2119,493 +2254,4 @@ async function tryTravelToMap5() {
 }
 </script>
 
-<style scoped>
-.game-map {
-	display: flex;
-	flex-direction: row;
-	gap: 12px;
-	align-items: flex-start;
-}
-
-.map-wrapper {
-	position: relative;
-	overflow: hidden;
-	border: 2px solid #333;
-	border-radius: 8px;
-	flex: 0 0 auto;
-}
-
-.map-image {
-	display: block;
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-
-.tiles-overlay {
-	position: absolute;
-	top: 0;
-	left: 0;
-	pointer-events: auto;
-}
-
-.player-click {
-	position: absolute;
-	top: 0;
-	left: 0;
-	z-index: 12;
-	cursor: pointer;
-}
-
-.npc-sprite {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 48px;
-	height: 48px;
-	image-rendering: pixelated;
-	z-index: 9;
-	pointer-events: none;
-}
-
-.gate-sprite {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 48px;
-	height: 48px;
-	image-rendering: pixelated;
-	z-index: 9;
-	pointer-events: none;
-}
-
-.portal-sprite {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 64px;
-	height: 64px;
-	image-rendering: pixelated;
-	z-index: 9;
-	pointer-events: none;
-}
-
-.house-sprite {
-	position: absolute;
-	top: 0;
-	left: 0;
-	image-rendering: pixelated;
-	z-index: 9;
-	pointer-events: none;
-}
-
-.chat-bubble {
-	position: absolute;
-	top: 0;
-	left: 0;
-	z-index: 13;
-	max-width: 180px;
-	padding: 6px 8px;
-	border-radius: 12px;
-	background: rgba(255,255,255,0.95);
-	color: #222;
-	font-size: 12px;
-	box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-	pointer-events: none;
-}
-.chat-bubble::after {
-	content: '';
-	position: absolute;
-	bottom: -6px;
-	left: 12px;
-	width: 0;
-	height: 0;
-	border-left: 6px solid transparent;
-	border-right: 6px solid transparent;
-	border-top: 6px solid rgba(255,255,255,0.95);
-}
-
-.chat-input {
-	display: block;
-}
-
-/* In-map chat: bottom-centered stone-themed bar using a 4-column grid.
-   Input spans 3 columns (3/4) and send button spans 1 column (1/4). */
-.chat-input.map-chat {
-	position: absolute;
-	bottom: 12px;
-	left: 50%;
-	transform: translateX(-50%);
-	z-index: 60;
-	width: min(720px, calc(100% - 48px));
-	max-width: 720px;
-	padding: 6px;
-	border-radius: 16px;
-	display: grid;
-	grid-template-columns: repeat(4, 1fr);
-	gap: 6px;
-	align-items: center;
-	background: #514F62; /* stone-themed background */
-	border: 1px solid #000; /* outer stroke black */
-	box-shadow: 0 6px 12px rgba(0,0,0,0.35);
-}
-.chat-input.map-chat input[type='text'] {
-	grid-column: 1 / span 3; /* spans 3 of 4 columns */
-	padding: 8px 10px;
-	border-radius: 12px;
-	border: 1.5px solid #FFCF4D; /* inner palette stroke */
-	outline: none;
-	background: rgba(255,255,255,0.98);
-	font-size: 13px;
-	width: 100%;
-}
-.chat-input.map-chat button {
-	grid-column: 4 / 5; /* takes the last 1/4 column */
-	padding: 8px 10px;
-	border-radius: 10px;
-	border: 1px solid rgba(0,0,0,0.12);
-	background: #d6a94a; /* earthy accent send button */
-	color: #fff;
-	font-weight: 700;
-	cursor: pointer;
-	font-size: 13px;
-}
-
-/* Settings modal (stone-themed) */
-.settings-modal {
-	position: absolute;
-	inset: 0; /* cover map wrapper */
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 120;
-	pointer-events: auto;
-}
-.settings-card {
-	width: min(360px, calc(100% - 48px));
-	background: #082F45;
-	border: 1px solid #FFCF4D;
-	padding: 14px;
-	border-radius: 12px;
-	box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-	color: #fff;
-}
-.settings-card h3 { margin: 0 0 8px 0; font-size: 16px; }
-.settings-row { display:flex; justify-content:space-between; align-items:center; margin:8px 0; }
-.settings-controls label { margin-left:8px; font-size:14px; color:#f3f3f3; }
-.settings-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
-.settings-card .btn.logout { background:#c0392b; border:1px solid rgba(0,0,0,0.2); color:#fff; font-weight:700; }
-
-/* User popup */
-.user-popup { pointer-events:auto; }
-.user-card { display:flex; gap:18px; align-items:flex-start; background:#082F45; border:1px solid #FFCF4D; padding:14px; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,0.5); color:#fff; width: min(560px, calc(100% - 48px)); }
-.user-left { display:flex; flex-direction:column; gap:12px; align-items:flex-start; min-width:180px; }
-.player-name { font-weight:800; font-size:16px; background:rgba(255,255,255,0.06); padding:8px 12px; border-radius:10px; }
-.user-right h4 { margin:0 0 8px 0; font-size:16px; }
-.inv-grid.small { display:grid; grid-template-columns:repeat(3, 64px); gap:8px; }
-.inv-slot.small { width:64px; height:64px; border-radius:8px; }
-.inv-inner { display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
-.inv-img { max-width:48px; max-height:48px; image-rendering:pixelated; }
-.user-sprite { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }
-.user-sprite :deep(svg) { width:56px; height:56px; max-width:100%; max-height:100%; display:block; filter:drop-shadow(0 0 6px rgba(0,0,0,0.7)); }
-
-/* color selector styles (reuse existing app pattern) */
-.color-selector { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
-.color-option { width:28px; height:28px; border:2px solid transparent; cursor:pointer; border-radius:6px; }
-.color-option.selected { border-color:#000; box-shadow:0 2px 6px rgba(0,0,0,0.35); }
-
-/* Top-right value display */
-.top-right-values { position: absolute; top: 8px; right: 8px; z-index: 110; pointer-events: none; }
-.top-right-values .value-card { pointer-events: auto; background: #082F45; border: 1px solid #FFCF4D; color: #fff; padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); font-size: 13px; }
-.top-right-values .value-card p { margin: 4px 0; }
-
-
-/* Map debug overlay */
-.map-debug {
-	position: absolute;
-	top: 8px;
-	left: 8px;
-	z-index: 80;
-	background: rgba(0,0,0,0.7);
-	color: #fff;
-	padding: 8px 10px;
-	border-radius: 6px;
-	font-size: 12px;
-	line-height: 1.2;
-	max-width: 320px;
-}
-.map-debug-row { margin: 4px 0; }
-
-.hud {
-
-	margin-top: 8px;
-	font-size: 0.9rem;
-	color: #555;
-}
-
-/* Inventory panel styles */
-.game-map {
-	display: flex;
-	gap: 12px;
-	align-items: flex-start;
-}
-.inventory-panel {
-	width: 260px;
-	/* background color requested */
-	background: #514F62;
-	/* outer stroke */
-	border: 3px solid #000000;
-	border-radius: 14px;
-	box-shadow: inset 0 8px 14px rgba(255,255,255,0.06), 0 8px 22px rgba(0,0,0,0.28);
-	padding: 12px;
-	z-index: 90;
-}
-.inv-title {
-	margin: 0 0 8px 0;
-	font-size: 14px;
-	text-align: center;
-	color: rgb(178, 204, 225);
-}
-.inv-grid {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 10px;
-}
-.inv-slot {
-	width: 72px;
-	height: 72px;
-	border-radius: 8px;
-	/* outer stroke for each slot */
-	border: 2px solid #000000;
-	background: linear-gradient(180deg,#584f57,#463f48);
-	box-shadow: inset 0 -6px 8px rgba(0,0,0,0.24), 0 4px 10px rgba(0,0,0,0.28);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	position: relative;
-}
-.inv-inner {
-	width: 56px;
-	height: 56px;
-	border-radius: 6px;
-	/* inner stroke (earthy) */
-	border: 2px solid #FFCF4D;
-	background: linear-gradient(180deg,#efeef3,#e6e2ea);
-	display:flex;align-items:center;justify-content:center;position:relative;
-}
-.inv-img { width:32px;height:32px; }
-.inv-emoji { font-size:22px; }
-.inv-count {
-	position: absolute;
-	right: -8px;
-	bottom: -8px;
-	background: rgba(0,0,0,0.85);
-	color: #fff;
-	font-size: 12px;
-	padding: 3px 7px;
-	border-radius: 12px;
-	box-shadow: 0 3px 6px rgba(0,0,0,0.5);
-}
-
-/* Top-left mini-buttons inside map */
-.map-top-left-buttons {
-	position: absolute;
-	top: 10px;
-	left: 10px;
-	display: flex;
-	flex-direction: row;
-	gap: 8px;
-	z-index: 120;
-}
-.ml-btn {
-	width: 44px;
-	height: 44px;
-	padding: 0;
-	border: 2px solid #000000; /* outer stroke black */
-	border-radius: 8px;
-	background: #082F45; /* panel background */
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	cursor: pointer;
-	box-shadow: 0 4px 8px rgba(0,0,0,0.35);
-}
-.ml-inner {
-	display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:2px solid #FFCF4D; /* inner palette stroke */background: linear-gradient(180deg,#efeef3,#e6e2ea);font-size:18px;
-}
-.ml-btn:active { transform: translateY(1px); }
-
-.banner {
-	margin: 6px 0;
-	padding: 6px 8px;
-	border-radius: 6px;
-	font-size: 0.85rem;
-}
-.banner.success { background: #e6ffed; color: #035c1a; border: 1px solid #b8f7c7; }
-.banner.warning { background: #fff8e1; color: #7a5600; border: 1px solid #ffe3a3; }
-.banner.error { background: #ffeaea; color: #7a0000; border: 1px solid #ffb0b0; }
-
-.controls {
-	font-size: 0.8rem;
-	color: #777;
-}
-
-.factory-progress {
-	position: absolute;
-	z-index: 11;
-	padding: 2px 4px;
-	background: rgba(0, 0, 0, 0.8);
-	color: #fff;
-	font-size: 10px;
-	border-radius: 4px;
-	transform-origin: bottom center;
-}
-
-.tile-progress {
-	position: absolute;
-	z-index: 12;
-	padding: 2px 4px;
-	background: rgba(0, 0, 0, 0.75);
-	color: #fff;
-	font-size: 10px;
-	border-radius: 4px;
-}
-
-.flower-particle {
-	position: absolute;
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: #ff69b4; /* pink */
-	opacity: 0.9;
-	animation: popFade 700ms ease-out forwards;
-}
-
-@keyframes popFade {
-	0% { opacity: 0.9; transform: scale(1); }
-	100% { opacity: 0; transform: scale(1.8); }
-}
-
-/* Shimmering highlight for waterable tiles on Map 3 */
-.waterable-shine {
-	position: absolute;
-	top: 0;
-	left: 0;
-	border-radius: 4px;
-	background: rgba(0, 200, 255, 0.06);
-	box-shadow: 0 0 4px 1px rgba(0, 200, 255, 0.35);
-	animation: shinePulse 1400ms ease-in-out infinite;
-	image-rendering: pixelated;
-	z-index: 8;
-	pointer-events: none;
-}
-/* Subtle highlight for fence targets on Map 4 */
-.fence-target-shine {
-	position: absolute;
-	top: 0;
-	left: 0;
-	border-radius: 4px;
-	background: rgba(120, 180, 120, 0.06);
-	box-shadow: 0 0 3px 1px rgba(120, 180, 120, 0.30);
-	animation: fencePulse 1600ms ease-in-out infinite;
-	image-rendering: pixelated;
-	z-index: 8;
-	pointer-events: none;
-}
-
-@keyframes fencePulse {
-	0% { box-shadow: 0 0 2px 1px rgba(120, 180, 120, 0.25); opacity: 0.5; }
-	50% { box-shadow: 0 0 6px 3px rgba(120, 190, 120, 0.55); opacity: 0.8; }
-	100% { box-shadow: 0 0 2px 1px rgba(120, 180, 120, 0.25); opacity: 0.5; }
-}
-
-@keyframes shinePulse {
-	0% { box-shadow: 0 0 3px 1px rgba(0, 200, 255, 0.30); opacity: 0.55; }
-	50% { box-shadow: 0 0 8px 3px rgba(0, 230, 255, 0.55); opacity: 0.8; }
-	100% { box-shadow: 0 0 3px 1px rgba(0, 200, 255, 0.30); opacity: 0.55; }
-}
-
-.inventory {
-	margin-left: 8px;
-}
-.inv-icon {
-	width: 16px;
-	height: 16px;
-	vertical-align: middle;
-	margin: 0 4px;
-}
-
-.exchange-modal {
-	position: fixed;
-	inset: 0;
-	background: rgba(0,0,0,0.5);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 100;
-}
-.exchange-card {
-	background: #082F45;
-	color: #fff;
-	padding: 16px;
-	border-radius: 8px;
-	width: 280px;
-	box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-	border: 1px solid #FFCF4D;
-}
-.exchange-card.wide {
-	width: 560px;
-}
-.trade-grid {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 12px;
-}
-.panel {
-	border: 1px solid #FFCF4D;
-	border-radius: 6px;
-	padding: 8px;
-}
-.tool-badge {
-	display: inline-block;
-	padding: 2px 6px;
-	margin-right: 6px;
-	background: #3e4a3e;
-	border-radius: 6px;
-	color: #e6e6d8;
-	font-size: 12px;
-}
-.exchange-card h3 {
-	margin: 0 0 8px;
-}
-.hint {
-	font-size: 12px;
-	color: #555;
-	margin: 0 0 10px;
-}
-.offer {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin: 8px 0;
-}
-.btn {
-	display: block;
-	width: 100%;
-	margin: 6px 0;
-	padding: 8px;
-	border: none;
-	background: #d6a94a;
-	color: #fff;
-	cursor: pointer;
-	border-radius: 6px;
-	font-weight: 700;
-}
-.btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-.btn.close {
-	background: #FFCF4D;
-}
-</style>
+<style src="./GameMap.css"></style>

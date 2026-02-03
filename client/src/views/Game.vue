@@ -114,7 +114,7 @@ onMounted(async () => {
 /* Earthy page background */
 .game-view {
 	min-height: 100vh;
-	background-color: #243726;
+	background-color: #1B7FA3;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -125,7 +125,7 @@ onMounted(async () => {
 .game-header {
 	width: 1030px;
 	max-width: 94%;
-	background: #2f4a36;
+	background: #082F45;
 	border: 6px solid #5b4a33;
 	border-radius: 16px;
 	color: white;
@@ -141,8 +141,8 @@ main {
 	min-width: 1030px;
 	width: 100%;
 	max-width: 1050px;
-	background: #334a37;
-	border: 6px solid #5b4a33;
+	background: #082F45;
+	border: 6px solid #FFCF4D;
 	border-radius: 16px;
 	padding: 20px;
 	color: white;
@@ -151,8 +151,8 @@ main {
 
 .map-section {
 	margin-top: 12px;
-	background: #243726;
-	border: 2px solid #5b4a33;
+	background: #082F45;
+	border: 2px solid #FFCF4D;
 	border-radius: 12px;
 	padding: 12px;
 }

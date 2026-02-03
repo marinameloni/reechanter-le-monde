@@ -6,6 +6,12 @@ export class GameRoom extends Room {
     // Persist mapId for this room instance (per-map room)
     this.mapId = typeof options?.mapId === 'number' ? options.mapId : 1;
 
+    // register active room instance for external inspection (leaderboard/current-game)
+    try {
+      if (!GameRoom.activeRooms) GameRoom.activeRooms = new Map();
+      GameRoom.activeRooms.set(this.roomId || this.mapId, this);
+    } catch (e) {}
+
     // État minimal pour commencer : sera enrichi plus tard
     this.setState({
       tiles: [],
@@ -82,6 +88,14 @@ export class GameRoom extends Room {
       }
       // Colyseus se charge de synchroniser l'état avec tous les clients
     });
+
+    // ensure we remove from registry when room is disposed
+    this.onDispose = () => {
+      try { if (GameRoom.activeRooms) GameRoom.activeRooms.delete(this.roomId || this.mapId); } catch (e) {}
+      // cleanup intervals
+      try { clearInterval(this._houseFlushInterval); } catch (e) {}
+      try { clearInterval(this._factoryFlushInterval); } catch (e) {}
+    };
 
     // Trade request: notify target player
     this.onMessage("requestTrade", (client, data) => {
@@ -338,6 +352,25 @@ export class GameRoom extends Room {
         if ((remaining?.c || 0) === 0) {
           this.broadcast('mapUnlocked', { mapId: 4 });
         }
+
+        // Update per-player constructive stats based on their contributions in this flush
+        for (const [sid, map] of this.pendingFlowerClicks.entries()) {
+          try {
+            const contributed = Array.from(map.values()).reduce((a, b) => a + b, 0);
+            if (!contributed) continue;
+            const me = this.state.clients.find(c => c.sessionId === sid);
+            const idPlayer = me && me.id_player;
+            if (!idPlayer) continue;
+            const exists = await db.get('SELECT 1 FROM player_stats WHERE id_player = ?;', [idPlayer]);
+            if (!exists) {
+              await db.run('INSERT INTO player_stats (id_player, constructive, harvest) VALUES (?, 0, 0);', [idPlayer]);
+            }
+            await db.run('UPDATE player_stats SET constructive = constructive + ? WHERE id_player = ?;', [contributed, idPlayer]);
+          } catch (e) {
+            // non-fatal per-player update; continue
+          }
+        }
+
         await db.exec('COMMIT;');
 
         // send per-player flush acks
