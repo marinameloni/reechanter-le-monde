@@ -1451,22 +1451,15 @@ const showUser = ref(false);
 const userPopupOffset = { x: 0, y: 30 }; // px offset above player
 const userPopupPos = ref({ left: '0px', top: '0px' });
 const userPopupStyle = computed(() => ({
-	position: 'absolute',
-	left: userPopupPos.value.left,
-	top: userPopupPos.value.top,
-	transform: 'translate(-50%, -100%)',
-	zIndex: 130,
+	position: 'fixed',
+	left: '50%',
+	top: '50%',
+	transform: 'translate(-50%, -50%)',
+	zIndex: 140,
 }));
 
 function openUser() {
-	try {
-		const tile = mapObj.value.tileSize || 50;
-		const px = (playerX.value * tile) + Math.floor(tile / 2) + userPopupOffset.x;
-		const py = (playerY.value * tile) + userPopupOffset.y;
-		userPopupPos.value = { left: px + 'px', top: py + 'px' };
-	} catch (e) {
-		userPopupPos.value = { left: '50%', top: '50%' };
-	}
+	// Show popup centered on screen instead of near the player
 	showUser.value = true;
 }
 function closeUser() { showUser.value = false; }

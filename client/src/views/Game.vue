@@ -3,13 +3,10 @@
 		<Header />
 
 		<main>
-			<p v-if="game.error" class="error">{{ game.error }}</p>
-			<p v-else-if="!game.connected">Connexion au serveur de jeu en cours <span class="loader" aria-hidden="true"></span></p>
-			<p v-else>Connecté au serveur temps réel (Colyseus).</p>
-
-
+			
 			<section class="players" v-if="game.clients.length">
-				<h2>Joueurs connectés</h2>
+				<h1>Bienvenue dans Repair Loop, {{ auth.user?.username }}!</h1>
+				<h2>Joueurs en ligne :</h2>
 				<ul class="player-list">
 					<li v-for="p in game.clients" :key="p.sessionId" class="userlist">
 						<div class="player-list-sprite" v-html="getPlayerSprite(p)"></div>
@@ -22,6 +19,11 @@
 			<section class="map-section">
 				<GameMap v-if="isReady && startMapId != null" :initialMapId="startMapId" />
 			</section>
+			<p v-if="game.error" class="error">{{ game.error }}</p>
+			<p v-else-if="!game.connected">Connexion au serveur de jeu en cours <span class="loader" aria-hidden="true"></span></p>
+			<p v-else>Connecté au serveur temps réel (Colyseus).</p>
+
+
 		</main>
 	</section>
 </template>
