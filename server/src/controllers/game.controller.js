@@ -48,14 +48,34 @@ export async function postTransfer(req, res) {
 
 export async function postExchange(req, res) {
 	try {
-		const { aId, bId, aToBBricks = 0, aToBRocks = 0, bToABricks = 0, bToARocks = 0 } = req.body || {};
+		const { aId, bId } = req.body || {};
+		let { aToBBricks = 0, aToBRocks = 0, bToABricks = 0, bToARocks = 0 } = req.body || {};
+
 		if (!aId || !bId) {
 			return res.status(400).json({ success: false, message: 'aId and bId are required' });
 		}
-		const result = await exchangeResources({ aId, bId, aToBBricks, aToBRocks, bToABricks, bToARocks });
-		res.json({ success: true, result });
+
+		// Normalize numeric inputs
+		aToBBricks = Number(aToBBricks) || 0;
+		aToBRocks = Number(aToBRocks) || 0;
+		bToABricks = Number(bToABricks) || 0;
+		bToARocks = Number(bToARocks) || 0;
+
+		// simple validation
+		if (aToBBricks < 0 || aToBRocks < 0 || bToABricks < 0 || bToARocks < 0) {
+			return res.status(400).json({ success: false, message: 'Invalid exchange amounts' });
+		}
+
+		try {
+			const result = await exchangeResources({ aId, bId, aToBBricks, aToBRocks, bToABricks, bToARocks });
+			return res.json({ success: true, result });
+		} catch (errInner) {
+			console.error('exchangeResources failed', { err: errInner, body: req.body });
+			throw errInner;
+		}
 	} catch (err) {
-		const insufficient = (err.message || '').includes('insufficient');
+		console.error('postExchange error', err);
+		const insufficient = (err.message || '').toLowerCase().includes('insufficient');
 		const code = insufficient ? 400 : 500;
 		res.status(code).json({ success: false, message: err.message || 'Failed to exchange resources' });
 	}

@@ -159,7 +159,7 @@ main {
 	padding: 12px;
 }
 
-.player-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.player-list { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
 .userlist { display:flex; align-items:center; gap:12px; padding:6px 8px; background: rgba(0,0,0,0.06); border-radius:8px; }
 .player-list-sprite svg { width: 36px; height: 36px; display: block; }
 .player-list-name { color: #fff; }
