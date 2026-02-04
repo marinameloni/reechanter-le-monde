@@ -1,89 +1,91 @@
 # Reenchanter le Monde
+Application cliente Vue 3 + Vite avec un backend Express + Colyseus. Le gameplay, au tour par tour ou en temps réel, s'exécute dans une `GameRoom` Colyseus tandis que des endpoints REST gèrent l'authentification et les données de jeu. Ce README propose une prise en main rapide et les étapes pour le développement.
 
-A Vue 3 + Vite client with an Express + Colyseus backend. Turn-based/real-time gameplay runs through a Colyseus `GameRoom` while REST endpoints handle auth and game data. This README is a quick orientation plus run steps for development.
-
-## Monorepo Structure
-
+## Structure du monorepo
 ```
+
 reechanter-le-monde/
-├─ client/                   # Vue 3 app (Vite + Pinia + Vue Router)
-│  ├─ src/
-│  │  ├─ views/             # Auth, Game, Admin pages
-│  │  ├─ components/        # UI + game components (tiles, buildings, sprites)
-│  │  ├─ store/             # Pinia stores: auth, game, map
-│  │  ├─ router/            # Client-side routes & guards
-│  │  ├─ services/          # Axios instance, client helpers
-│  │  ├─ utils/             # Shared helpers/constants
-│  │  └─ assets/            # Sprites, maps (e.g., map1.json)
-│  └─ vite.config.js
-├─ server/                   # Express + Colyseus
-│  ├─ src/
-│  │  ├─ server.js          # Express + Colyseus on HTTP port 4000
-│  │  ├─ controllers/       # REST controllers (auth, game, map, player)
-│  │  ├─ routes/            # Express routers for API modules
-│  │  ├─ middlewares/       # (auth/error) middleware scaffolding
-│  │  ├─ rooms/             # Colyseus GameRoom
-│  │  ├─ models/            # SQLite models
-│  │  ├─ services/          # Business logic modules
-│  │  ├─ config/            # DB connection
-│  │  └─ database/          # SQLite file, migrations, seeds
+├─ client/ # Application Vue 3 (Vite + Pinia + Vue Router)
+│ ├─ src/
+│ │ ├─ views/ # Pages : Auth, Game, Admin
+│ │ ├─ components/ # Composants UI et de jeu (tuiles, bâtiments, sprites)
+│ │ ├─ store/ # Stores Pinia : auth, game, map
+│ │ ├─ router/ # Routes client et guards
+│ │ ├─ services/ # Instance Axios, helpers côté client
+│ │ ├─ utils/ # Helpers/constants partagés
+│ │ └─ assets/ # Sprites, maps (ex. map1.json)
+│ └─ vite.config.js
+├─ server/ # Express + Colyseus
+│ ├─ src/
+│ │ ├─ server.js # Express + Colyseus sur le port HTTP 4000
+│ │ ├─ controllers/ # Contrôleurs REST (auth, game, map, player)
+│ │ ├─ routes/ # Routeurs Express pour les modules API
+│ │ ├─ middlewares/ # Middlewares (auth/erreur)
+│ │ ├─ rooms/ # `GameRoom` Colyseus
+│ │ ├─ models/ # Modèles SQLite
+│ │ ├─ services/ # Modules de logique métier
+│ │ ├─ config/ # Connexion DB
+│ │ └─ database/ # Fichier SQLite, migrations, seeds
 └─ README.md
+
 ```
 
-## Quick Start (Dev)
+## Démarrage rapide (développement)
 
-Run backend and frontend in separate terminals:
+Lancez le backend et le frontend dans deux terminaux séparés :
 
 ```powershell
 # Backend
 Push-Location "server"
 npm install
-npm start     # starts Express + Colyseus on http://localhost:4000
+npm start     # démarre Express + Colyseus en ligne
 
 # Frontend
 Push-Location "client"
 npm install
-npm run dev   # starts Vite on http://localhost:5173
-```
+npm run dev   # démarre Vite sur http://localhost:5173
+````
 
-Notes:
+Remarques :
 
-- The backend binds to port `4000`. If you see `EADDRINUSE`, stop the existing process or change the port in `server/src/server.js`.
-- The client proxies requests to the backend using the `baseURL` in `client/src/services/api.js`.
 
-## Auth Behavior
+- Le client proxy les requêtes vers le backend en utilisant le `baseURL` défini dans `client/src/services/api.js`.
 
-- Login/Signup returns a JWT that now expires in 1 day.
-- The client persists `user` and `token` to `localStorage` and restores them on app start via `useAuthStore().init()`.
-- On startup, the store decodes `exp` and clears auth if expired; otherwise the user stays logged in until explicit logout or 24h passes.
-- All Axios calls include the `Authorization: Bearer <token>` header via a request interceptor.
+## Comportement de l'authentification
 
-## Key Files
+- Les actions de connexion/inscription renvoient un JWT qui expire actuellement au bout d'un jour.
+- Le client persiste `user` et `token` dans le `localStorage` et les restaure au démarrage de l'application via `useAuthStore().init()`.
+- Au démarrage, le store décode le champ `exp` et purge l'authentification si le token est expiré ; sinon l'utilisateur reste connecté jusqu'à déconnexion explicite ou la fin des 24h.
+- Toutes les requêtes Axios incluent l'entête `Authorization: Bearer <token>` via un interceptor sur les requêtes.
+
+## Fichiers clés
 
 - Client
-  - `client/src/main.js`: Bootstraps Vue, installs Pinia and router, hydrates auth.
-  - `client/src/router/index.js`: `/auth`, `/game`, `/admin` with admin guard.
-  - `client/src/store/auth.store.js`: Auth state, persistence, login/signup/logout.
-  - `client/src/views/Auth.vue`: Login/Signup UI + color selection.
-  - `client/src/views/Game.vue`: Shows player info, color picker, players list, and `GameMap`.
-  - `client/src/components/game/*`: Map tiles, buildings, ruins, player sprite, construction menu, signup preview.
-  - `client/src/services/api.js`: Axios instance + auth header interceptor.
+  - `client/src/main.js` : Initialise Vue, installe Pinia et le router, hydrate l'auth.
+  - `client/src/router/index.js` : Routes `/auth`, `/game`, `/admin` avec guard admin.
+  - `client/src/store/auth.store.js` : État d'auth, persistance, login/signup/logout.
+  - `client/src/views/Auth.vue` : UI de connexion/inscription + sélection de couleur.
+  - `client/src/views/Game.vue` : Affiche les infos joueur, sélecteur de couleur, liste des joueurs et `GameMap`.
+  - `client/src/components/game/*` : Tuiles, bâtiments, ruines, sprite joueur, menu de construction, aperçu d'inscription.
+  - `client/src/services/api.js` : Instance Axios + interceptor pour l'entête d'auth.
 
-- Server
-  - `server/src/server.js`: Express app + Colyseus `GameRoom` on the same HTTP server.
-  - `server/src/controllers/auth.controller.js`: Signup/Login with bcrypt and JWT; 1‑day expiry.
-  - `server/src/routes/*.routes.js`: Router modules mounting controllers.
-  - `server/src/rooms/GameRoom.js`: Real-time game room logic.
-  - `server/src/database/migrations/init.sql`: Base schema; `game.sqlite` holds data.
+- Serveur
+  - `server/src/server.js` : Application Express + `GameRoom` Colyseus sur le même serveur HTTP.
+  - `server/src/controllers/auth.controller.js` : Inscription/Connexion avec bcrypt et JWT ; expiration 1 jour.
+  - `server/src/routes/*.routes.js` : Modules routeurs qui montent les contrôleurs.
+  - `server/src/rooms/GameRoom.js` : Logique temps réel de la salle de jeu.
+  - `server/src/database/migrations/init.sql` : Schéma de base ; `game.sqlite` contient les données.
 
-## Roadmap / Next Steps
+## Feuille de route / Prochaines étapes
 
-- Implement and wire `server/src/middlewares/auth.middleware.js` to protect sensitive routes (`/api/player`, `/api/game` mutations).
-- Move JWT secret to environment variables.
-- Add a visible logout button in the header, and optionally an Axios response interceptor to auto-logout on `401`.
+- Implémenter et brancher `server/src/middlewares/auth.middleware.js` pour protéger les routes sensibles (`/api/player`, mutations `/api/game`).
+- Déplacer le secret JWT vers des variables d'environnement.
+- Ajouter un bouton de déconnexion visible dans l'en-tête, et éventuellement un interceptor de réponse Axios pour déconnecter automatiquement sur `401`.
 
-## Troubleshooting
+## Dépannage
 
-- Port conflict on `4000`: terminate existing server (`Ctrl+C`) or change port.
-- Stale credentials: clear browser `localStorage` keys `auth_token` and `auth_user`.
-- DB issues: remove `server/src/database/game.sqlite` and re-run migration/seed from SQL files, if needed.
+- Identifiants obsolètes : supprimez les clés `auth_token` et `auth_user` dans le `localStorage` du navigateur.
+- Problèmes de base de données : supprimez `server/src/database/game.sqlite` et relancez les migrations/seeds à partir des fichiers SQL si nécessaire.
+
+```
+
