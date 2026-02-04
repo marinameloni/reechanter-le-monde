@@ -5,23 +5,23 @@
     <div class="game-container">
       <div class="auth-content">
         <div class="player-card">
-          <div class="card-inner" :style="{ '--accent': signupForm.color }">
+            <div class="card-inner" :style="{ '--accent': signupForm.color }">
             <div class="sprite-container">
               <div v-if="previewSvg" class="svg-preview" v-html="previewSvg"></div>
               <div v-else class="svg-preview" v-html="frontSvg"></div>
             </div>
-            <h2 class="display-name">{{ signupForm.username || 'NEW ROBOT' }}</h2>
+            <h2 class="display-name">{{ signupForm.username || 'NOUVEAU ROBOT' }}</h2>
           </div>
         </div>
 
         <div class="form-container">
           <div class="form-area signup-scroll">
-            <h2>Create Robot</h2>
-            <input v-model="signupForm.username" placeholder="Username" class="cp-input" />
-            <input v-model="signupForm.email" placeholder="Email" class="cp-input" />
-            <input v-model="signupForm.password" type="password" placeholder="Password" class="cp-input" />
+            <h2>Créer un robot</h2>
+            <input v-model="signupForm.username" placeholder="Nom d'utilisateur" class="cp-input" />
+            <input v-model="signupForm.email" placeholder="E-mail" class="cp-input" />
+            <input v-model="signupForm.password" type="password" placeholder="Mot de passe" class="cp-input" />
 
-            <p>Robot Color:</p>
+            <p>Couleur du robot :</p>
             <div class="color-selector">
               <div
                 v-for="c in availableColors" :key="c"
@@ -31,11 +31,11 @@
                 @click="selectColor(c)"
               ></div>
             </div>
-            <button class="btn-cp-login" @click="handleSignup">Create</button>
+            <button class="btn-cp-login" @click="handleSignup">Créer</button>
           </div>
 
           <div class="sticky-note">
-            KEEP YOUR PASSWORD A SECRET
+            NE PARTAGEZ PAS VOTRE MOT DE PASSE
           </div>
         </div>
       </div>

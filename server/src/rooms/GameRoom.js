@@ -72,21 +72,40 @@ export class GameRoom extends Room {
     };
 
     // Cap per-player pending factory clicks per flush interval to avoid huge spikes
+    // For Map 2 we remove this cap to allow high-frequency buffered clicks.
     this.factoryPerIntervalCap = 50;
+
+    // Buffer or immediately apply clicks to ruins depending on map
+    // We add buffering for Map 2 to avoid per-player cooldowns and DB contention.
+    this.pendingRuinClicks = new Map(); // sessionId -> Map(ruinId -> count)
 
     this.onMessage("clickRuin", (client, data) => {
       const ruin = this.state.ruins.find((r) => r.id_ruin === data.id_ruin);
-      if (ruin) {
-        // If ruin has coordinates, enforce proximity
-        const rx = typeof ruin.x === 'number' ? ruin.x : (typeof ruin.tile_x === 'number' ? ruin.tile_x : null);
-        const ry = typeof ruin.y === 'number' ? ruin.y : (typeof ruin.tile_y === 'number' ? ruin.tile_y : null);
-        if (rx !== null && ry !== null && !this._isInRange(client.sessionId, rx, ry, 6)) {
-          try { client.send('actionDenied', { action: 'clickRuin', reason: 'out_of_range' }); } catch {}
-          return;
-        }
-        ruin.clicks_current = (ruin.clicks_current || 0) + (data.click_value || 1);
+      if (!ruin) return;
+      // If ruin has coordinates, enforce proximity
+      const rx = typeof ruin.x === 'number' ? ruin.x : (typeof ruin.tile_x === 'number' ? ruin.tile_x : null);
+      const ry = typeof ruin.y === 'number' ? ruin.y : (typeof ruin.tile_y === 'number' ? ruin.tile_y : null);
+      if (rx !== null && ry !== null && !this._isInRange(client.sessionId, rx, ry, 6)) {
+        try { client.send('actionDenied', { action: 'clickRuin', reason: 'out_of_range' }); } catch {}
+        return;
       }
-      // Colyseus se charge de synchroniser l'état avec tous les clients
+
+      const sid = client.sessionId;
+      const inc = (data && typeof data.click_value === 'number') ? Math.max(0, Math.floor(data.click_value)) : 1;
+      if (inc <= 0) return;
+
+      // If this room is Map 2, buffer ruin clicks and flush periodically to DB.
+      if (this.mapId === 2) {
+        const playerMap = this.pendingRuinClicks.get(sid) || new Map();
+        const prev = playerMap.get(ruin.id_ruin) || 0;
+        playerMap.set(ruin.id_ruin, prev + inc);
+        this.pendingRuinClicks.set(sid, playerMap);
+        try { client.send('ruinClickQueued', { id_ruin: ruin.id_ruin, inc }); } catch {}
+        return;
+      }
+
+      // Otherwise, apply directly to in-memory state (Colyseus will sync to clients)
+      ruin.clicks_current = (ruin.clicks_current || 0) + inc;
     });
 
     // ensure we remove from registry when room is disposed
@@ -95,6 +114,7 @@ export class GameRoom extends Room {
       // cleanup intervals
       try { clearInterval(this._houseFlushInterval); } catch (e) {}
       try { clearInterval(this._factoryFlushInterval); } catch (e) {}
+      try { clearInterval(this._ruinFlushInterval); } catch (e) {}
     };
 
     // Trade request: notify target player
@@ -253,15 +273,22 @@ export class GameRoom extends Room {
       const inc = (data && typeof data.inc === 'number') ? Math.max(0, Math.floor(data.inc)) : 1;
       if (inc <= 0) return;
       const sid = client.sessionId;
-      const prev = this.pendingFactoryClicks.get(sid) || 0;
-      const allowed = Math.max(0, this.factoryPerIntervalCap - prev);
-      const toAdd = Math.min(inc, allowed);
-      if (toAdd <= 0) {
-        // optionally ignore excess clicks
-        try { client.send('factoryClickDenied', { reason: 'rate_limited' }); } catch {}
-        return;
+      // For Map 2 we remove the per-interval cap and allow full buffering
+      let toAdd = inc;
+      if (this.mapId !== 2) {
+        const prev = this.pendingFactoryClicks.get(sid) || 0;
+        const allowed = Math.max(0, this.factoryPerIntervalCap - prev);
+        toAdd = Math.min(inc, allowed);
+        if (toAdd <= 0) {
+          try { client.send('factoryClickDenied', { reason: 'rate_limited' }); } catch {}
+          return;
+        }
+        this.pendingFactoryClicks.set(sid, prev + toAdd);
+      } else {
+        // map 2: fully buffer without per-player cap
+        const prev = this.pendingFactoryClicks.get(sid) || 0;
+        this.pendingFactoryClicks.set(sid, prev + toAdd);
       }
-      this.pendingFactoryClicks.set(sid, prev + toAdd);
       // Immediate ack so client can update local UI optimistically
       try { client.send('factoryClickQueued', { inc: toAdd }); } catch {}
     });
@@ -272,14 +299,21 @@ export class GameRoom extends Room {
       const inc = (data && typeof data.inc === 'number') ? Math.max(0, Math.floor(data.inc)) : 0;
       if (inc <= 0) return;
       const sid = client.sessionId;
-      const prev = this.pendingFactoryClicks.get(sid) || 0;
-      const allowed = Math.max(0, this.factoryPerIntervalCap - prev);
-      const toAdd = Math.min(inc, allowed);
-      if (toAdd <= 0) {
-        try { client.send('factoryClickDenied', { reason: 'rate_limited' }); } catch {}
-        return;
+      // For Map 2 do not enforce per-interval cap; buffer everything.
+      let toAdd = inc;
+      if (this.mapId !== 2) {
+        const prev = this.pendingFactoryClicks.get(sid) || 0;
+        const allowed = Math.max(0, this.factoryPerIntervalCap - prev);
+        toAdd = Math.min(inc, allowed);
+        if (toAdd <= 0) {
+          try { client.send('factoryClickDenied', { reason: 'rate_limited' }); } catch {}
+          return;
+        }
+        this.pendingFactoryClicks.set(sid, prev + toAdd);
+      } else {
+        const prev = this.pendingFactoryClicks.get(sid) || 0;
+        this.pendingFactoryClicks.set(sid, prev + toAdd);
       }
-      this.pendingFactoryClicks.set(sid, prev + toAdd);
       try { client.send('factoryClickQueued', { inc: toAdd }); } catch {}
     });
 
@@ -579,6 +613,63 @@ export class GameRoom extends Room {
       }
     }, 1000);
 
+    // Flush pending ruin clicks every 500ms (buffered) — used for Map 2 to avoid cooldowns
+    this._ruinFlushInterval = setInterval(async () => {
+      if (!this.pendingRuinClicks || this.pendingRuinClicks.size === 0) return;
+      // Aggregate per-ruin totals across players
+      const ruinTotals = new Map(); // id_ruin -> total clicks
+      for (const [, map] of this.pendingRuinClicks.entries()) {
+        for (const [k, v] of map.entries()) {
+          ruinTotals.set(k, (ruinTotals.get(k) || 0) + v);
+        }
+      }
+      if (ruinTotals.size === 0) {
+        this.pendingRuinClicks.clear();
+        return;
+      }
+      try {
+        const db = await openDB();
+        await db.exec('BEGIN TRANSACTION;');
+        for (const [idRu, total] of ruinTotals.entries()) {
+          // ensure ruin exists
+          const row = await db.get('SELECT clicks_current, clicks_required, is_destroyed FROM ruin WHERE id_ruin = ?;', [idRu]);
+          if (!row) continue;
+          const current = (row.clicks_current || 0) + total;
+          const required = row.clicks_required || 0;
+          const newClicks = required > 0 ? Math.min(required, current) : current;
+          const destroyed = (newClicks >= required && required > 0) ? 1 : (row.is_destroyed || 0);
+          await db.run('UPDATE ruin SET clicks_current = ?, is_destroyed = ?, updated_at = CURRENT_TIMESTAMP WHERE id_ruin = ?;', [newClicks, destroyed, idRu]);
+
+          // update in-memory state so Colyseus syncs to clients
+          const stateR = this.state.ruins.find(r => r.id_ruin === idRu);
+          if (stateR) {
+            stateR.clicks_current = newClicks;
+            stateR.is_destroyed = destroyed;
+          }
+          if (destroyed) {
+            try { this.broadcast('ruinDestroyed', { id_ruin: idRu }); } catch (e) {}
+          }
+        }
+        await db.exec('COMMIT;');
+
+        // send per-player acknowledgements
+        for (const [sid, map] of this.pendingRuinClicks.entries()) {
+          try {
+            const contributed = Array.from(map.values()).reduce((a, b) => a + b, 0);
+            const clientEntry = [...this.clientByUsername.entries()].find(([, cl]) => cl.sessionId === sid);
+            if (clientEntry) {
+              try { clientEntry[1].send('ruinClickFlushed', { inc: contributed }); } catch (e) {}
+            }
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.error('Failed to flush ruin clicks', err);
+        try { const db2 = await openDB(); await db2.exec('ROLLBACK;'); } catch (e) {}
+      } finally {
+        this.pendingRuinClicks.clear();
+      }
+    }, 500);
+
     // Partner sends counter-offer back to proposer
     this.onMessage("tradeCounterOffer", (client, data) => {
       const from = this.state.clients.find(c => c.sessionId === client.sessionId);
@@ -791,5 +882,6 @@ export class GameRoom extends Room {
     try { clearInterval(this._factoryFlushInterval); } catch {}
     try { clearInterval(this._flowerFlushInterval); } catch {}
     try { clearInterval(this._houseFlushInterval); } catch {}
+    try { clearInterval(this._ruinFlushInterval); } catch {}
   }
 }

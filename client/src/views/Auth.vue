@@ -21,21 +21,34 @@
 
         <div class="form-container">
           <div class="form-area">
-            <label>Username:</label>
-            <input v-model="loginForm.username" placeholder="Username" class="cp-input" />
-            <label>Password:</label>
-            <input v-model="loginForm.password" type="password" class="cp-input" />
+            <label>Nom d'utilisateur :</label>
+            <input v-model="loginForm.username" placeholder="Nom d'utilisateur" class="cp-input" />
+            <label>Mot de passe :</label>
+            <input v-model="loginForm.password" type="password" placeholder="Mot de passe" class="cp-input" />
             
             <div class="checkbox-group">
-              <label><input type="checkbox"> Remember me on this computer</label>
-              <label><input type="checkbox"> Remember my password</label>
+              <label><input type="checkbox" v-model="rememberMe"> Se souvenir de moi sur cet ordinateur</label>
+              <label><input type="checkbox" v-model="rememberPassword"> Mémoriser mon mot de passe</label>
             </div>
 
-            <button class="btn-cp-login" @click="handleLogin">Login</button>
+            <button class="btn-cp-login" @click="handleLogin">Se connecter</button>
             
             <div class="secondary-links">
-              <a href="#">Forgot your password?</a>
-              <a href="#">Forget my robot</a>
+              <a href="#" @click.prevent="showForgotModal = true">Mot de passe oublié ?</a>
+              <a href="#" @click.prevent="forgetRobot">Oublier mon robot</a>
+            </div>
+
+            <div v-if="showForgotModal" class="forgot-modal">
+              <div class="forgot-inner">
+                <h3>Mot de passe oublié ?</h3>
+                <p>Entrez votre e-mail pour recevoir les instructions de réinitialisation.</p>
+                <input v-model="forgotEmail" placeholder="E-mail" class="cp-input" />
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                  <button class="btn-cp-login" @click="sendForgot" :disabled="forgotSending">Envoyer</button>
+                  <button class="btn close" @click="showForgotModal=false">Fermer</button>
+                </div>
+                <p class="hint" v-if="forgotMessage">{{ forgotMessage }}</p>
+              </div>
             </div>
           </div>
 
@@ -44,7 +57,7 @@
           
 
           <div class="sticky-note">
-            KEEP YOUR PASSWORD A SECRET
+            NE PARTAGEZ PAS VOTRE MOT DE PASSE
           </div>
         </div>
       </div>
@@ -54,7 +67,7 @@
           <img src="../assets/logo.png" alt="Logo" class="main-logo" />
         </div>
         <button class="switch-mode-btn" @click="router.push('/create')">
-          Create a Robot
+          Créer un robot
         </button>
       </div>
     </div>
@@ -64,7 +77,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, onBeforeUnmount } from 'vue';
+import { reactive, ref, watch, onBeforeUnmount, onMounted } from 'vue';
 import Header from '../components/ui/Header.vue';
 import Footer from '../components/ui/Footer.vue';
 import SignupSpritePreview from '../components/game/SignupSpritePreview.vue';
@@ -81,6 +94,14 @@ const loginForm = reactive({
   password: ''
 });
 
+// Remember / forgot controls
+const rememberMe = ref(false);
+const rememberPassword = ref(false);
+const showForgotModal = ref(false);
+const forgotEmail = ref('');
+const forgotMessage = ref('');
+const forgotSending = ref(false);
+
 const signupForm = reactive({
   username: '',
   email: '',
@@ -92,6 +113,25 @@ const availableColors = ['blue', 'green', 'orange', 'pink', 'purple', 'red', 'tu
 
 const previewUser = ref(null);
 let lookupTimer = null;
+
+// load saved credentials & flags
+onMounted(() => {
+  try {
+    const rm = localStorage.getItem('rememberMe');
+    const rp = localStorage.getItem('rememberPassword');
+    rememberMe.value = rm === 'true';
+    rememberPassword.value = rp === 'true';
+
+    const raw = localStorage.getItem('savedCredentials');
+    if (raw) {
+      const creds = JSON.parse(raw);
+      if (creds?.username && rememberMe.value) loginForm.username = creds.username;
+      if (creds?.password && rememberPassword.value) loginForm.password = creds.password;
+    }
+  } catch (e) {
+    // ignore storage errors
+  }
+});
 
 const lookupUsername = async (name) => {
   previewUser.value = null;
@@ -120,6 +160,19 @@ onBeforeUnmount(() => {
 const handleLogin = async () => {
   await auth.login({ username: loginForm.username, password: loginForm.password });
   if (!auth.user) return;
+  // persist remember settings
+  try {
+    if (rememberMe.value) localStorage.setItem('rememberMe', 'true'); else localStorage.removeItem('rememberMe');
+    if (rememberPassword.value) localStorage.setItem('rememberPassword', 'true'); else localStorage.removeItem('rememberPassword');
+
+    if (rememberMe.value) {
+      const toSave = { username: loginForm.username };
+      if (rememberPassword.value) toSave.password = loginForm.password;
+      localStorage.setItem('savedCredentials', JSON.stringify(toSave));
+    } else {
+      localStorage.removeItem('savedCredentials');
+    }
+  } catch (e) {}
   router.push('/game');
 };
 
@@ -130,6 +183,36 @@ const handleSignup = async () => {
 };
 
 // signup is handled on separate CreateRobot page
+
+const forgetRobot = () => {
+  try {
+    localStorage.removeItem('savedRobot');
+    localStorage.removeItem('signup_draft');
+    localStorage.removeItem('savedSignup');
+  } catch (e) {}
+  previewUser.value = null;
+  // give quick feedback
+  try { alert('Robot supprimé localement.'); } catch (_) {}
+};
+
+const sendForgot = async () => {
+  forgotMessage.value = '';
+  if (!forgotEmail.value) { forgotMessage.value = 'Veuillez entrer un e-mail.'; return; }
+  forgotSending.value = true;
+  try {
+    // best-effort endpoint; backend may implement /api/auth/forgot
+    const res = await api.post('/api/auth/forgot', { email: forgotEmail.value });
+    if (res.data?.success) {
+      forgotMessage.value = "E-mail de réinitialisation envoyé si l'adresse existe.";
+    } else {
+      forgotMessage.value = res.data?.message || 'Demande envoyée.';
+    }
+  } catch (err) {
+    forgotMessage.value = err.response?.data?.message || "Impossible d'envoyer l'e-mail de réinitialisation.";
+  } finally {
+    forgotSending.value = false;
+  }
+};
 </script>
 
 <style scoped>
@@ -244,6 +327,26 @@ const handleSignup = async () => {
   box-shadow: 5px 5px 10px rgba(0,0,0,0.2);
   text-align: center;
   border-bottom-right-radius: 30px 5px;
+}
+
+.forgot-modal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  z-index: 300;
+}
+.forgot-inner {
+  background: #082F45;
+  padding: 20px;
+  border-radius: 8px;
+  width: 360px;
+  color: #fff;
 }
 
 .ui-footer { 

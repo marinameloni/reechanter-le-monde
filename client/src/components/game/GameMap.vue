@@ -4,21 +4,21 @@
 		<audio ref="bgMusic" id="bg-music" :src="musicSrc" preload="auto" loop style="display:none"></audio>
 		<div class="map-wrapper" :style="wrapperStyle">
 			<!-- Top-left quick action buttons inside the game screen -->
-			<div class="map-top-left-buttons" role="group" aria-label="Quick actions">
-				<button class="ml-btn" title="Settings" @click.prevent="openSettings">
+			<div class="map-top-left-buttons" role="group" aria-label="Actions rapides">
+				<button class="ml-btn" title="Paramètres" @click.prevent="openSettings">
 					<span class="ml-inner">
 						<img src="../../assets/sprites/settinglogo.png">
 					</span>
 				</button>
-				<button class="ml-btn" title="Leaderboard" @click.prevent="openLeaderboard">
+				<button class="ml-btn" title="Classement" @click.prevent="openLeaderboard">
 					<span class="ml-inner">
-						<img :src="leaderboardImg" alt="Leaderboard" />
+						<img :src="leaderboardImg" alt="Classement" />
 					</span>
 				</button>
-				<button class="ml-btn" title="User" @click.prevent="openUser">
+				<button class="ml-btn" title="Utilisateur" @click.prevent="openUser">
 					<span class="ml-inner">👤</span>
 				</button>
-				<button class="ml-btn" title="Map" @click.prevent>
+				<button class="ml-btn" title="Carte" @click.prevent>
 					<span class="ml-inner">
 						<img src="../../assets/sprites/mapicon.png">
 					</span>
@@ -28,10 +28,10 @@
 			<!-- Top-right resource/value display -->
 			<div class="top-right-values" aria-hidden="false">
 				<div class="value-card">
-					<p v-if="activeMapId === 3">Flowers planted: {{ flowersPlanted }} / {{ flowersTotal }}</p>
-					<p v-else-if="activeMapId === 4">Fences built: {{ fencesBuiltCount }} / {{ fencesTotal }}</p>
-					<p v-else-if="activeMapId === 5">Houses built: {{ housesBuiltCount }} / {{ housesTotal }} | {{ housesProgressDisplay }}</p>
-					<p v-else>Factory Progress: {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
+					<p v-if="activeMapId === 3">Fleurs plantées : {{ flowersPlanted }} / {{ flowersTotal }}</p>
+					<p v-else-if="activeMapId === 4">Clôtures construites : {{ fencesBuiltCount }} / {{ fencesTotal }}</p>
+					<p v-else-if="activeMapId === 5">Maisons construites : {{ housesBuiltCount }} / {{ housesTotal }} | {{ housesProgressDisplay }}</p>
+					<p v-else>Progression usine : {{ currentFactoryProgress.current }} / {{ currentFactoryProgress.required }}</p>
 				</div>
 			</div>
 			<img :src="mapImage" :alt="mapObj.name" class="map-image" />
@@ -46,10 +46,10 @@
 					@mouseleave="clearTileHover"
 				/>
 			</div>
-			<!-- NPC exchanger overlay -->
+			<!-- Overlay du PNJ échangeur -->
 			<img
 				:src="npcImg"
-				alt="NPC Exchanger"
+				alt="PNJ échangeur"
 				class="npc-sprite"
 				:style="{ transform: `translate(${npcX * mapObj.tileSize}px, ${npcY * mapObj.tileSize}px)` }"
 			/>
@@ -385,7 +385,7 @@
 								</ul>
 							</template>
 							<div class="settings-actions">
-								<button class="btn" @click="closeLeaderboard">Close</button>
+								<button class="btn" @click="closeLeaderboard">Fermer</button>
 							</div>
 						</div>
 					</div>
@@ -399,40 +399,40 @@
 		<!-- Simple Exchange Modal -->
 		<div v-if="showExchange" class="exchange-modal">
 			<div class="exchange-card">
-				<h3>Trade with NPC</h3>
+				<h3>Échanger avec le PNJ</h3>
 				<p class="hint">
-					Trade bricks and rocks for tools.
-					Watering Can lets you water trees (coming soon).
-					Shovel doubles your factory clicks (x2).
+					Échangez des briques et des pierres contre des outils.
+					L'arrosoir permet d'arroser (bientôt disponible).
+					La pelle double vos clics d'usine (x2).
 				</p>
 				<p class="offer">
-					<img :src="wateringCanImg" alt="Watering Can" class="inv-icon"/> Watering Can:
-					<span>{{ offers.watering.bricks }} bricks + {{ offers.watering.rocks }} rocks</span>
+					<img :src="wateringCanImg" alt="Arrosoir" class="inv-icon"/> Arrosoir :
+					<span>{{ offers.watering.bricks }} briques + {{ offers.watering.rocks }} pierres</span>
 				</p>
 				<button
 					class="btn"
 					:disabled="bricks < offers.watering.bricks || rocks < offers.watering.rocks"
 					@click="buyItem('watering')"
 				>
-					Buy Watering Can
+					Acheter l'arrosoir
 				</button>
 
 				<p class="offer">
-					<img :src="shovelImg" alt="Shovel" class="inv-icon"/> Shovel:
-					<span>{{ offers.shovel.bricks }} bricks + {{ offers.shovel.rocks }} rocks</span>
+					<img :src="shovelImg" alt="Pelle" class="inv-icon"/> Pelle :
+					<span>{{ offers.shovel.bricks }} briques + {{ offers.shovel.rocks }} pierres</span>
 				</p>
 				<button
 					class="btn"
 					:disabled="bricks < offers.shovel.bricks || rocks < offers.shovel.rocks"
 					@click="buyItem('shovel')"
 				>
-					Buy Shovel
+					Acheter la pelle
 				</button>
 
 				<!-- Fertilizer (Map 3 only) -->
 				<p class="offer" v-if="activeMapId === 3">
-					<img :src="fertilizerImg" alt="Fertilizer" class="inv-icon"/> Fertilizer:
-					<span>{{ offers.fertilizer.bricks }} bricks + {{ offers.fertilizer.rocks }} rocks</span>
+					<img :src="fertilizerImg" alt="Engrais" class="inv-icon"/> Engrais :
+					<span>{{ offers.fertilizer.bricks }} briques + {{ offers.fertilizer.rocks }} pierres</span>
 				</p>
 				<button
 					v-if="activeMapId === 3"
@@ -440,10 +440,10 @@
 					:disabled="bricks < offers.fertilizer.bricks || rocks < offers.fertilizer.rocks"
 					@click="buyItem('fertilizer')"
 				>
-					Buy Fertilizer
+					Acheter l'engrais
 				</button>
 
-				<button class="btn close" @click="showExchange = false">Close</button>
+				<button class="btn close" @click="showExchange = false">Fermer</button>
 			</div>
 		</div>
 	
@@ -452,61 +452,61 @@
 	<div v-if="showPlayerCard" class="exchange-modal">
 		<div class="exchange-card">
 			<h3>{{ selectedPlayer?.username }}</h3>
-			<p class="hint">Robot color: <strong>{{ selectedPlayer?.color || 'unknown' }}</strong></p>
-			<p>Bricks: {{ selectedInventory.bricks }} | Rocks: {{ selectedInventory.rocks }}</p>
+			<p class="hint">Couleur du robot : <strong>{{ selectedPlayer?.color || 'inconnue' }}</strong></p>
+			<p>Briques : {{ selectedInventory.bricks }} | Pierres : {{ selectedInventory.rocks }}</p>
 			<div>
-				<span>Tools: </span>
+				<span>Outils : </span>
 				<span v-for="(count, type) in selectedInventory.tools" :key="type" style="margin-right:8px;">
 					{{ type }} x{{ count }}
 				</span>
 			</div>
-			<button class="btn" @click="requestTrade">Ask to trade</button>
-			<button class="btn close" @click="showPlayerCard = false">Close</button>
+			<button class="btn" @click="requestTrade">Demander un échange</button>
+			<button class="btn close" @click="showPlayerCard = false">Fermer</button>
 		</div>
 	</div>
 
 	<!-- Incoming Trade Notification -->
 	<div v-if="incomingTrade" class="exchange-modal">
 		<div class="exchange-card">
-			<h3>Trade Request</h3>
-			<p>{{ incomingTrade.fromUsername }} wants to trade with you.</p>
-			<button class="btn" @click="respondTrade(true)">Accept</button>
-			<button class="btn close" @click="respondTrade(false)">Decline</button>
+			<h3>Demande d'échange</h3>
+			<p>{{ incomingTrade.fromUsername }} souhaite échanger avec vous.</p>
+			<button class="btn" @click="respondTrade(true)">Accepter</button>
+			<button class="btn close" @click="respondTrade(false)">Refuser</button>
 		</div>
 	</div>
 
 	<!-- Trade Form Modal for both players -->
 	<div v-if="showTradeForm" class="exchange-modal">
 		<div class="exchange-card wide">
-			<h3>Trading with {{ tradePartner }}</h3>
+			<h3>Échange avec {{ tradePartner }}</h3>
 			<div class="trade-grid">
 				<div class="panel">
-					<h4>Your Inventory</h4>
-					<p>Bricks: {{ bricks }} | Rocks: {{ rocks }}</p>
+					<h4>Votre inventaire</h4>
+					<p>Briques : {{ bricks }} | Pierres : {{ rocks }}</p>
 					<div>
-						<span>Tools: </span>
-						<span class="tool-badge" v-if="wateringCans">watering_can x{{ wateringCans }}</span>
-						<span class="tool-badge" v-if="shovels">shovel x{{ shovels }}</span>
+						<span>Outils : </span>
+						<span class="tool-badge" v-if="wateringCans">arrosoir x{{ wateringCans }}</span>
+						<span class="tool-badge" v-if="shovels">pelle x{{ shovels }}</span>
 					</div>
-					<label>Bricks to send
+					<label>Briques à envoyer
 						<input type="number" v-model.number="bricksToSend" min="0" />
 					</label>
-					<label>Rocks to send
+					<label>Pierres à envoyer
 						<input type="number" v-model.number="rocksToSend" min="0" />
 					</label>
-						<button class="btn" @click="proposeOffer" :disabled="waitingPartnerConfirm">Propose Offer</button>
-					<p v-if="waitingPartnerConfirm" class="hint">Waiting for partner confirmation...</p>
+						<button class="btn" @click="proposeOffer" :disabled="waitingPartnerConfirm">Proposer l'offre</button>
+					<p v-if="waitingPartnerConfirm" class="hint">En attente de confirmation du partenaire...</p>
 				</div>
 				<div class="panel">
-					<h4>{{ tradePartner }}'s Inventory</h4>
-					<p>Bricks: {{ partnerInventory.bricks }} | Rocks: {{ partnerInventory.rocks }}</p>
+					<h4>Inventaire de {{ tradePartner }}</h4>
+					<p>Briques : {{ partnerInventory.bricks }} | Pierres : {{ partnerInventory.rocks }}</p>
 					<div>
 						<span>Tools: </span>
 						<span v-for="(count, type) in partnerInventory.tools" :key="type" class="tool-badge">{{ type }} x{{ count }}</span>
 					</div>
 				</div>
 			</div>
-			<button class="btn close" @click="showTradeForm = false">Close</button>
+			<button class="btn close" @click="showTradeForm = false">Fermer</button>
 		</div>
 	</div>
 
