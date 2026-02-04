@@ -540,12 +540,6 @@
 			<button class="btn close" @click="cancelFinal">Cancel</button>
 		</div>
 	</div>
-
-			<!-- On-screen joystick (mobile) -->
-			<div v-if="isMobile" class="joystick" @touchstart.prevent="startJoystick" @touchmove.prevent="moveJoystick" @touchend.prevent="endJoystick" @mousedown.prevent="startJoystick" @mousemove.prevent="moveJoystick" @mouseup.prevent="endJoystick">
-				<div class="joystick-base"></div>
-				<div class="joystick-knob" :style="knobStyle"></div>
-			</div>
 </template>
 <script setup>
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue';
@@ -2089,93 +2083,9 @@ function handleKeyDown(event) {
 	}
 }
 
-// --- On-screen joystick (mobile) ---
-const isMobile = ref(false);
-const joystickActive = ref(false);
-const joystickCenter = ref({ x: 0, y: 0 });
-const joystickPointer = ref({ x: 0, y: 0 });
-const joystickInterval = ref(null);
-const lastJoystickDir = ref(null);
-
-function updateIsMobile() {
-	try { isMobile.value = window.innerWidth <= 768; } catch (e) { isMobile.value = false; }
-}
-
-function getPointFromEvent(e) {
-	if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-	return { x: e.clientX || 0, y: e.clientY || 0 };
-}
-
-function startJoystick(e) {
-	updateIsMobile();
-	if (!isMobile.value) return;
-	joystickActive.value = true;
-	const el = e.currentTarget || e.target;
-	const rect = el.getBoundingClientRect();
-	// center at element center
-	joystickCenter.value = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-	joystickPointer.value = getPointFromEvent(e);
-	computeAndSendDir(true);
-	if (joystickInterval.value) clearInterval(joystickInterval.value);
-	joystickInterval.value = setInterval(() => computeAndSendDir(false), 220);
-}
-
-function moveJoystick(e) {
-	if (!joystickActive.value) return;
-	joystickPointer.value = getPointFromEvent(e);
-	// update knob position; do not spam movements here — interval handles repeated moves
-}
-
-function endJoystick(e) {
-	joystickActive.value = false;
-	lastJoystickDir.value = null;
-	if (joystickInterval.value) { clearInterval(joystickInterval.value); joystickInterval.value = null; }
-}
-
-function computeAndSendDir(sendImmediate) {
-	const dx = joystickPointer.value.x - joystickCenter.value.x;
-	const dy = joystickPointer.value.y - joystickCenter.value.y;
-	const threshold = 12; // px
-	let dir = null;
-	if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) {
-		dir = null;
-	} else if (Math.abs(dx) > Math.abs(dy)) {
-		dir = dx > 0 ? 'right' : 'left';
-	} else {
-		dir = dy > 0 ? 'down' : 'up';
-	}
-
-	if (!dir) return;
-	// send movement only when direction changes or immediate flag is set
-	if (dir !== lastJoystickDir.value || sendImmediate) {
-		lastJoystickDir.value = dir;
-		if (dir === 'right') movePlayer(1, 0);
-		else if (dir === 'left') movePlayer(-1, 0);
-		else if (dir === 'up') movePlayer(0, -1);
-		else if (dir === 'down') movePlayer(0, 1);
-	}
-}
-
-// compute knob style for small visual feedback
-const knobStyle = computed(() => {
-	if (!joystickActive.value) return { transform: 'translate(0px,0px)' };
-	const dx = joystickPointer.value.x - joystickCenter.value.x;
-	const dy = joystickPointer.value.y - joystickCenter.value.y;
-	const max = 30;
-	const mag = Math.sqrt(dx * dx + dy * dy) || 1;
-	const nx = Math.max(-max, Math.min(max, Math.round((dx / mag) * Math.min(max, mag))));
-	const ny = Math.max(-max, Math.min(max, Math.round((dy / mag) * Math.min(max, mag))));
-	return { transform: `translate(${nx}px, ${ny}px)` };
-});
-
-// resize listener registered on mount
-
 onMounted(async () => {
 	// Ensure Colyseus message handlers are bound even if room already exists
 	registerRoomHandlers();
-
-	// joystick resize handler
-	try { window.addEventListener('resize', updateIsMobile); updateIsMobile(); } catch (e) {}
 
 	window.addEventListener('keydown', handleKeyDown);
 
@@ -2244,8 +2154,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
 	window.removeEventListener('keydown', handleKeyDown);
-	try { window.removeEventListener('resize', updateIsMobile); } catch (e) {}
-	if (joystickInterval.value) { clearInterval(joystickInterval.value); joystickInterval.value = null; }
 });
 
 async function tryTravelToMap2() {

@@ -3,7 +3,6 @@ import App from './App.vue';
 import router from './router';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './store/auth.store';
-import './styles/mobile.css';
 
 const app = createApp(App);
 
